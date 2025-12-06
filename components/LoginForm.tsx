@@ -8,10 +8,9 @@ interface LoginFormProps {
 }
 
 export const LoginForm: React.FC<LoginFormProps> = ({ onLogin, isLoading, errorMessage }) => {
-  // Hardcoded API URL as requested (Updated)
+  // Hardcoded API URL as requested
   const DEFAULT_API_URL = "https://script.google.com/macros/s/AKfycbwbKWSXgJ2ZuaL4KIMI9oIbTBL3Z4GxjsY3HTbzRsXeVPyIwir5GNdVjJhHCRUDvIXC7A/exec";
   
-  // 優先從 localStorage 讀取設定的網址，若無則使用預設值
   const [name, setName] = useState('');
   const [otp, setOtp] = useState('');
   const [apiUrl] = useState(() => localStorage.getItem('gas_api_url') || DEFAULT_API_URL);
@@ -59,7 +58,6 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLogin, isLoading, errorM
             <div className="relative">
               <input
                 id="otp"
-                // Change to password type to hide characters and force English keyboard on mobile
                 type={showPassword ? "text" : "password"}
                 required
                 value={otp}
@@ -99,12 +97,11 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLogin, isLoading, errorM
         </form>
       </div>
 
-      {/* 右下角 LOGO 圖片 */}
-      {/* 使用 Google Drive Thumbnail 連結格式，通常比 uc?export=view 更穩定 */}
+      {/* 右下角 LOGO 圖片 - RWD 設定 + 高透明度 */}
       <img 
         src="https://drive.google.com/thumbnail?id=19Fag6zUzuv8wLA91p1X9Gtv3QdtivEFv&sz=w1000" 
         alt="PM CORE Logo"
-        className="fixed bottom-4 right-4 w-36 md:w-56 h-auto object-contain pointer-events-none z-0 opacity-100 transition-all duration-300"
+        className="fixed bottom-4 right-4 w-32 md:w-48 h-auto object-contain pointer-events-none z-0 opacity-70 transition-all duration-300"
       />
     </>
   );

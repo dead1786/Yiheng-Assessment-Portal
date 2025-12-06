@@ -48,7 +48,6 @@ export const AssessmentForm: React.FC<AssessmentFormProps> = ({ user, onBack, qu
       }
     }
 
-    // 移除 confirm，避免按鈕無反應
     console.log("準備提交...", { apiUrl, name: user.name, details: { title: user.jobTitle, grade: user.jobGrade } });
     setIsSubmitting(true);
     setStatusMessage({type: 'info', text: '正在同步資料至 Google Sheets，請稍候...'});
@@ -56,11 +55,17 @@ export const AssessmentForm: React.FC<AssessmentFormProps> = ({ user, onBack, qu
     try {
       await new Promise(r => setTimeout(r, 500));
       
-      const result = await submitAssessment(apiUrl, user.name, answers, {
-        jobTitle: user.jobTitle,
-        jobGrade: user.jobGrade,
-        yearsOfService: user.yearsOfService
-      });
+      const result = await submitAssessment(
+        apiUrl, 
+        user.name, 
+        answers, 
+        {
+          jobTitle: user.jobTitle,
+          jobGrade: user.jobGrade,
+          yearsOfService: user.yearsOfService
+        },
+        questions // 傳遞當下回答的題目，供 AI 參考
+      );
       console.log("提交回傳:", result);
       
       if (result.success) {

@@ -93,7 +93,8 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ user, apiUrl, onBack }
                       </span>
                       <span className="text-xl font-bold text-purple-700">{record.aiScore || '-'}</span>
                     </div>
-                    <div className="text-sm text-gray-700 bg-white p-3 rounded-lg border border-purple-100 min-h-[60px]">
+                    {/* 新增 whitespace-pre-wrap */}
+                    <div className="text-sm text-gray-700 bg-white p-3 rounded-lg border border-purple-100 min-h-[60px] whitespace-pre-wrap">
                       {record.aiComment || <span className="text-gray-400 italic">無評語</span>}
                     </div>
                   </div>

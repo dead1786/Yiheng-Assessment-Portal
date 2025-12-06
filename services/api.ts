@@ -58,18 +58,18 @@ export const submitAssessment = async (
   apiUrl: string,
   name: string,
   answers: string[],
-  // 新增參數
-  userDetails?: { jobTitle?: string, jobGrade?: string, yearsOfService?: string }
+  userDetails?: { jobTitle?: string, jobGrade?: string, yearsOfService?: string },
+  questions?: string[] // 新增參數: 題目
 ): Promise<{ success: boolean; message: string }> => {
   try {
     return await apiRequest(apiUrl, {
       action: 'submitAssessment',
       name,
       answers,
-      // 傳遞快照資訊
       jobTitle: userDetails?.jobTitle || "",
       jobGrade: userDetails?.jobGrade || "",
-      yearsOfService: userDetails?.yearsOfService || ""
+      yearsOfService: userDetails?.yearsOfService || "",
+      questions: questions || [] // 傳遞題目
     });
   } catch (error) {
     console.error("Submit Error:", error);
@@ -145,7 +145,6 @@ export const submitAdminReview = async (
   }
 };
 
-// 新增: 獲取員工名單
 export const fetchEmployeeList = async (apiUrl: string): Promise<EmployeeListResponse> => {
   try {
     return await apiRequest(apiUrl, { action: 'getEmployeeList' });
@@ -154,7 +153,6 @@ export const fetchEmployeeList = async (apiUrl: string): Promise<EmployeeListRes
   }
 };
 
-// 新增: 更新員工名單
 export const updateEmployeeList = async (
   apiUrl: string,
   employees: Employee[]

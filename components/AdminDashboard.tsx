@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { User, AssessmentRecord, Employee } from '../types';
-import { fetchAdminData, updateQuestions, updateAdminPassword, submitAdminReview, fetchEmployeeList, updateEmployeeList } from '../services/api';
-import { LogOut, Users, FileEdit, Save, Loader2, RefreshCw, KeyRound, MessageSquare, Calculator, X, Link, UserPlus, Trash2, Edit } from 'lucide-react';
+import { fetchAdminData, updateAdminPassword, submitAdminReview, fetchEmployeeList, updateEmployeeList } from '../services/api';
+import { LogOut, Users, Save, Loader2, RefreshCw, KeyRound, MessageSquare, Calculator, X, Link, UserPlus, Trash2 } from 'lucide-react';
 
 interface AdminDashboardProps {
   user: User;
@@ -10,9 +10,8 @@ interface AdminDashboardProps {
 }
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, onLogout }) => {
-  const [activeTab, setActiveTab] = useState<'records' | 'employees' | 'settings' | 'security'>('records');
+  const [activeTab, setActiveTab] = useState<'records' | 'employees' | 'security'>('records');
   const [records, setRecords] = useState<AssessmentRecord[]>([]);
-  const [questions, setQuestions] = useState<string[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -28,7 +27,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
       const data = await fetchAdminData(apiUrl);
       if (data.success) {
         setRecords(data.records);
-        setQuestions(data.questions);
       }
       const empData = await fetchEmployeeList(apiUrl);
       if (empData.success) {
@@ -54,10 +52,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
   const handleAddEmployee = () => {
     setEmployees([...employees, {
       name: '新員工',
-      joinDate: new Date().toISOString().split('T')[0],
+      joinDate: new Date().toISOString().split('T')[0].replace(/-/g, '/'),
       jobTitle: '職稱',
       yearsOfService: '0',
       jobGrade: '1',
+      jobGradeBonus: '0',
+      salary: '0',
       permission: true
     }]);
   };
@@ -74,24 +74,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
       alert(result.message);
     } catch (error) {
       alert("儲存員工名單失敗");
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleQuestionChange = (index: number, value: string) => {
-    const newQ = [...questions];
-    newQ[index] = value;
-    setQuestions(newQ);
-  };
-
-  const handleSaveQuestions = async () => {
-    setIsSaving(true);
-    try {
-      const result = await updateQuestions(apiUrl, questions);
-      alert(result.message);
-    } catch (error) {
-      alert("儲存失敗: " + (error instanceof Error ? error.message : "未知錯誤"));
     } finally {
       setIsSaving(false);
     }
@@ -154,7 +136,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
     if (!selectedRecord) return 0;
     const ai = selectedRecord.aiScore || 0;
     const admin = parseInt(adminReview.score) || 0;
-    return Math.round(ai * 0.7 + admin * 0.3);
+    // 修改: 權重 6:4
+    return Math.round(ai * 0.6 + admin * 0.4);
   };
 
   const formatDate = (dateStr: string) => {
@@ -211,14 +194,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
           員工管理
         </button>
         <button
-          onClick={() => setActiveTab('settings')}
-          className={`px-5 py-2.5 rounded-lg font-medium transition-all whitespace-nowrap ${
-            activeTab === 'settings' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-gray-600 hover:bg-gray-50'
-          }`}
-        >
-          題庫設定
-        </button>
-        <button
           onClick={() => setActiveTab('security')}
           className={`px-5 py-2.5 rounded-lg font-medium transition-all whitespace-nowrap flex items-center ${
             activeTab === 'security' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-gray-600 hover:bg-gray-50'
@@ -239,12 +214,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-gray-50 border-b border-gray-200 text-gray-700">
-                  <th className="p-4 font-bold whitespace-nowrap">提交時間</th>
-                  <th className="p-4 font-bold whitespace-nowrap">員工姓名</th>
+                <tr className="bg-gray-50 border-b border-gray-200 text-gray-700 whitespace-nowrap">
+                  <th className="p-4 font-bold text-center">提交時間</th>
+                  <th className="p-4 font-bold text-center">員工姓名</th>
                   <th className="p-4 font-bold text-center">AI 分數</th>
                   <th className="p-4 font-bold text-center">最終分數</th>
-                  <th className="p-4 font-bold min-w-[200px]">AI 評語</th>
+                  <th className="p-4 font-bold text-center min-w-[200px]">AI 評語</th>
                   <th className="p-4 font-bold text-right">操作</th>
                 </tr>
               </thead>
@@ -256,13 +231,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
                 ) : (
                   records.map((record, idx) => (
                     <tr key={idx} className="border-b border-gray-100 hover:bg-blue-50/30 transition-colors">
-                      <td className="p-4 text-sm text-gray-500 whitespace-nowrap">{formatDate(record.timestamp)}</td>
-                      <td className="p-4 font-medium text-gray-800">
+                      <td className="p-4 text-sm text-gray-500 whitespace-nowrap text-center">{formatDate(record.timestamp)}</td>
+                      <td className="p-4 font-medium text-gray-800 whitespace-nowrap text-center">
                         {record.name}
                         <div className="text-xs text-gray-400 font-normal">{record.jobTitle} {record.jobGrade && `(${record.jobGrade})`}</div>
                       </td>
-                      <td className="p-4 text-center text-gray-500">{record.aiScore || '-'}</td>
-                      <td className="p-4 text-center">
+                      <td className="p-4 text-center text-gray-500 whitespace-nowrap">{record.aiScore || '-'}</td>
+                      <td className="p-4 text-center whitespace-nowrap">
                         {record.finalScore ? (
                           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-sm font-bold
                             ${record.finalScore >= 80 ? 'bg-green-100 text-green-800' : 
@@ -272,15 +247,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
                           </span>
                         ) : <span className="text-gray-400 text-sm">未複評</span>}
                       </td>
-                      <td className="p-4 text-sm text-gray-600">
+                      <td className="p-4 text-sm text-gray-600 whitespace-pre-wrap min-w-[200px] max-w-[400px]">
                         {record.aiComment ? (
                            <div className="flex items-start gap-1">
                              <MessageSquare size={14} className="mt-1 flex-shrink-0 text-blue-400" />
-                             <span className="line-clamp-2">{record.aiComment}</span>
+                             <span className="line-clamp-3">{record.aiComment}</span>
                            </div>
                         ) : <span className="text-gray-400 italic">待評分</span>}
                       </td>
-                      <td className="p-4 text-right">
+                      <td className="p-4 text-right whitespace-nowrap">
                         <button 
                           onClick={() => openReviewModal(record)}
                           className="px-3 py-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg text-sm font-medium transition-colors"
@@ -312,62 +287,79 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-gray-50 text-gray-700 border-b border-gray-200">
-                  <th className="p-3 whitespace-nowrap min-w-[100px]">姓名</th>
-                  <th className="p-3 whitespace-nowrap min-w-[120px]">到職日</th>
-                  <th className="p-3 whitespace-nowrap min-w-[100px]">職稱</th>
-                  <th className="p-3 whitespace-nowrap w-[80px]">年資</th>
-                  <th className="p-3 whitespace-nowrap w-[80px]">職等</th>
-                  <th className="p-3 whitespace-nowrap w-[100px] text-center">允許考核</th>
-                  <th className="p-3 w-[60px]"></th>
+                <tr className="bg-gray-50 text-gray-700 border-b border-gray-200 whitespace-nowrap">
+                  <th className="p-3 text-center">姓名</th>
+                  <th className="p-3 text-center">到職日</th>
+                  <th className="p-3 text-center">職稱</th>
+                  <th className="p-3 text-center">年資</th>
+                  <th className="p-3 text-center">職等</th>
+                  <th className="p-3 text-center">職等加給</th>
+                  <th className="p-3 text-center">薪資</th>
+                  <th className="p-3 text-center">授權</th>
+                  <th className="p-3 text-center"></th>
                 </tr>
               </thead>
               <tbody>
                 {employees.map((emp, index) => (
                   <tr key={index} className="border-b border-gray-100 hover:bg-gray-50">
-                    <td className="p-2">
+                    <td className="p-2 min-w-[100px]">
                       <input 
                         type="text" 
                         value={emp.name}
                         onChange={(e) => handleEmployeeChange(index, 'name', e.target.value)}
-                        className="w-full px-2 py-1 border border-gray-200 rounded focus:ring-2 focus:ring-blue-500 outline-none"
+                        className="w-full px-2 py-1 border border-gray-200 rounded focus:ring-2 focus:ring-blue-500 outline-none text-center"
                       />
                     </td>
-                    <td className="p-2">
+                    <td className="p-2 min-w-[120px]">
                       <input 
                         type="text" 
                         value={emp.joinDate}
                         onChange={(e) => handleEmployeeChange(index, 'joinDate', e.target.value)}
-                        className="w-full px-2 py-1 border border-gray-200 rounded focus:ring-2 focus:ring-blue-500 outline-none"
+                        className="w-full px-2 py-1 border border-gray-200 rounded focus:ring-2 focus:ring-blue-500 outline-none text-center"
                         placeholder="YYYY/M/D"
                       />
                     </td>
-                    <td className="p-2">
+                    <td className="p-2 min-w-[100px]">
                       <input 
                         type="text" 
                         value={emp.jobTitle}
                         onChange={(e) => handleEmployeeChange(index, 'jobTitle', e.target.value)}
-                        className="w-full px-2 py-1 border border-gray-200 rounded focus:ring-2 focus:ring-blue-500 outline-none"
+                        className="w-full px-2 py-1 border border-gray-200 rounded focus:ring-2 focus:ring-blue-500 outline-none text-center"
                       />
                     </td>
-                    <td className="p-2">
+                    <td className="p-2 w-[80px]">
                       <input 
                         type="text" 
                         value={emp.yearsOfService}
                         disabled
-                        className="w-full px-2 py-1 border border-gray-200 rounded bg-gray-100 text-gray-500 cursor-not-allowed outline-none"
-                        title="年資由系統自動計算，無法修改"
+                        className="w-full px-2 py-1 border border-gray-200 rounded bg-gray-100 text-gray-500 cursor-not-allowed outline-none text-center"
                       />
                     </td>
-                    <td className="p-2">
+                    <td className="p-2 w-[80px]">
                       <input 
                         type="text" 
                         value={emp.jobGrade}
                         onChange={(e) => handleEmployeeChange(index, 'jobGrade', e.target.value)}
-                        className="w-full px-2 py-1 border border-gray-200 rounded focus:ring-2 focus:ring-blue-500 outline-none"
+                        className="w-full px-2 py-1 border border-gray-200 rounded focus:ring-2 focus:ring-blue-500 outline-none text-center"
                       />
                     </td>
-                    <td className="p-2 text-center">
+                    <td className="p-2 min-w-[100px]">
+                      <input 
+                        type="text" 
+                        value={emp.jobGradeBonus}
+                        onChange={(e) => handleEmployeeChange(index, 'jobGradeBonus', e.target.value)}
+                        className="w-full px-2 py-1 border border-gray-200 rounded focus:ring-2 focus:ring-blue-500 outline-none text-center"
+                      />
+                    </td>
+                    <td className="p-2 min-w-[100px]">
+                      <input 
+                        type="text" 
+                        value={emp.salary}
+                        disabled
+                        className="w-full px-2 py-1 border border-gray-200 rounded bg-gray-100 text-gray-500 cursor-not-allowed outline-none text-center"
+                      />
+                    </td>
+                    <td className="p-2 text-center w-[60px]">
                       <input 
                         type="checkbox" 
                         checked={emp.permission}
@@ -375,7 +367,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
                         className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500"
                       />
                     </td>
-                    <td className="p-2 text-center">
+                    <td className="p-2 text-center w-[50px]">
                       <button 
                         onClick={() => handleDeleteEmployee(index)}
                         className="p-1.5 text-red-500 hover:bg-red-50 rounded-full transition-colors"
@@ -398,38 +390,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
             >
               {isSaving ? <Loader2 className="animate-spin mr-2" /> : <Save className="mr-2 w-4 h-4" />}
               儲存變更 (更新至試算表)
-            </button>
-          </div>
-        </div>
-      ) : activeTab === 'settings' ? (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
-          <div className="flex items-center gap-3 mb-6 text-gray-800">
-            <FileEdit className="text-blue-600" />
-            <h2 className="text-xl font-bold">修改考核題目</h2>
-          </div>
-          
-          <div className="space-y-6">
-            {questions.map((q, idx) => (
-              <div key={idx}>
-                <label className="block text-sm font-bold text-gray-700 mb-2">題目 {idx + 1}</label>
-                <input
-                  type="text"
-                  value={q}
-                  onChange={(e) => handleQuestionChange(idx, e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                />
-              </div>
-            ))}
-          </div>
-
-          <div className="mt-8 pt-6 border-t border-gray-100">
-            <button
-              onClick={handleSaveQuestions}
-              disabled={isSaving}
-              className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium flex items-center shadow-md active:scale-95 transition-all"
-            >
-              {isSaving ? <Loader2 className="animate-spin mr-2" /> : <Save className="mr-2 w-4 h-4" />}
-              儲存變更
             </button>
           </div>
         </div>
@@ -539,17 +499,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
                     </span>
                     <span className="text-2xl font-bold text-purple-700">{selectedRecord.aiScore}</span>
                   </div>
-                  <p className="text-sm text-gray-700 leading-relaxed bg-white p-3 rounded-lg border border-purple-100">
+                  {/* 加入 whitespace-pre-wrap 讓 Modal 內的評語也正確換行 */}
+                  <p className="text-sm text-gray-700 leading-relaxed bg-white p-3 rounded-lg border border-purple-100 whitespace-pre-wrap">
                     {selectedRecord.aiComment}
                   </p>
                 </div>
 
                 <div className="border-t border-gray-100 pt-6">
-                  <h4 className="font-bold text-gray-700 border-l-4 border-green-500 pl-3 mb-4">管理員複評</h4>
+                  <h4 className="font-bold text-gray-700 border-l-4 border-green-500 pl-3 mb-4">主管複評</h4>
                   
                   <div className="space-y-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">管理員評分 (佔 30%)</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">主管評分 (佔 40%)</label>
                       <input
                         type="number"
                         min="0"
@@ -561,7 +522,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">管理員評語</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">主管評語</label>
                       <textarea
                         rows={3}
                         value={adminReview.comment}
@@ -572,7 +533,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
                     </div>
 
                     <div className="bg-gray-100 p-4 rounded-lg flex justify-between items-center">
-                      <span className="font-medium text-gray-600">預估最終分數 (70% AI + 30% 管理員)</span>
+                      <span className="font-medium text-gray-600">預估最終分數 (60% AI + 40% 主管)</span>
                       <span className="text-2xl font-bold text-blue-600">{calculateProjectedScore()}</span>
                     </div>
 

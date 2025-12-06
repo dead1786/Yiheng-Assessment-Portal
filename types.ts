@@ -3,7 +3,6 @@ export interface AuthResponse {
   message: string;
   isAdmin?: boolean;
   questions?: string[];
-  // 新增: 登入時回傳的員工詳細資訊
   userDetails?: {
     jobTitle: string;
     jobGrade: string;
@@ -14,7 +13,6 @@ export interface AuthResponse {
 export interface User {
   name: string;
   isAdmin: boolean;
-  // 新增: 用於快照當前狀態
   jobTitle?: string;
   jobGrade?: string;
   yearsOfService?: string;
@@ -24,16 +22,17 @@ export interface Employee {
   name: string;
   joinDate: string;
   jobTitle: string;
-  yearsOfService: string; // 試算表可能存為數字或公式，前端視為字串處理較安全
+  yearsOfService: string;
   jobGrade: string;
-  permission: boolean; // 授權開關
+  jobGradeBonus: string; // 新增: 職等加給
+  salary: string; 
+  permission: boolean;
 }
 
 export interface AssessmentRecord {
   rowIndex?: number; 
   timestamp: string;
   name: string;
-  // 新增: 紀錄當下的職位狀態
   jobTitle?: string;
   jobGrade?: string;
   yearsOfService?: string;
