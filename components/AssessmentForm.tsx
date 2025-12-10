@@ -6,11 +6,12 @@ import { submitAssessment } from '../services/api';
 interface AssessmentFormProps {
   user: User;
   onBack: () => void;
+  onSuccess: () => void; // 新增這個屬性
   questions: string[];
   apiUrl: string;
 }
 
-export const AssessmentForm: React.FC<AssessmentFormProps> = ({ user, onBack, questions, apiUrl }) => {
+export const AssessmentForm: React.FC<AssessmentFormProps> = ({ user, onBack, onSuccess, questions, apiUrl }) => {
   const [answers, setAnswers] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{type: 'success' | 'error' | 'info', text: string} | null>(null);
@@ -48,31 +49,33 @@ export const AssessmentForm: React.FC<AssessmentFormProps> = ({ user, onBack, qu
       }
     }
 
-    // 移除 confirm，避免按鈕無反應
-    console.log("準備提交...", { apiUrl, name: user.name, details: { title: user.jobTitle, grade: user.jobGrade } });
     setIsSubmitting(true);
     setStatusMessage({type: 'info', text: '正在同步資料至 Google Sheets，請稍候...'});
     
     try {
       await new Promise(r => setTimeout(r, 500));
       
-      const result = await submitAssessment(apiUrl, user.name, answers, {
-        jobTitle: user.jobTitle,
-        jobGrade: user.jobGrade,
-        yearsOfService: user.yearsOfService
-      });
-      console.log("提交回傳:", result);
+      const result = await submitAssessment(
+        apiUrl, 
+        user.name, 
+        answers, 
+        {
+          jobTitle: user.jobTitle,
+          jobGrade: user.jobGrade,
+          yearsOfService: user.yearsOfService
+        },
+        questions
+      );
       
       if (result.success) {
         setStatusMessage({type: 'success', text: '✅ 提交成功！系統已完成 AI 評分。即將返回...'});
         setTimeout(() => {
-            onBack();
+            onSuccess(); // 成功後呼叫 onSuccess，這會觸發 App.tsx 把權限關掉
         }, 2000);
       } else {
         setStatusMessage({type: 'error', text: `❌ 提交失敗：${result.message}`});
       }
     } catch (error) {
-      console.error("提交例外錯誤:", error);
       setStatusMessage({type: 'error', text: `❌ 系統錯誤：${error instanceof Error ? error.message : "未知錯誤"}`});
     } finally {
       setIsSubmitting(false);

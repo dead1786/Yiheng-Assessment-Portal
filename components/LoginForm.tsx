@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Loader2, AlertCircle, Eye, EyeOff } from 'lucide-react';
 
 interface LoginFormProps {
@@ -8,18 +8,90 @@ interface LoginFormProps {
 }
 
 export const LoginForm: React.FC<LoginFormProps> = ({ onLogin, isLoading, errorMessage }) => {
-  // Hardcoded API URL as requested (Updated)
   const DEFAULT_API_URL = "https://script.google.com/macros/s/AKfycbwbKWSXgJ2ZuaL4KIMI9oIbTBL3Z4GxjsY3HTbzRsXeVPyIwir5GNdVjJhHCRUDvIXC7A/exec";
   
-  // 優先從 localStorage 讀取設定的網址，若無則使用預設值
   const [name, setName] = useState('');
   const [otp, setOtp] = useState('');
   const [apiUrl] = useState(() => localStorage.getItem('gas_api_url') || DEFAULT_API_URL);
   const [showPassword, setShowPassword] = useState(false);
+  const [isSendingLine, setIsSendingLine] = useState(false);
+  
+  // 新增：倒數計時狀態 (秒)
+  const [countdown, setCountdown] = useState(0);
+
+  // 初始化：檢查 LocalStorage 是否有還沒跑完的冷卻時間
+  useEffect(() => {
+    const savedTargetTime = localStorage.getItem('otp_cooldown_target');
+    if (savedTargetTime) {
+      const targetTime = parseInt(savedTargetTime, 10);
+      const now = Date.now();
+      if (targetTime > now) {
+        // 如果還沒到時間，算出剩餘秒數
+        const remainingSeconds = Math.ceil((targetTime - now) / 1000);
+        setCountdown(remainingSeconds);
+      } else {
+        // 時間已過，清除紀錄
+        localStorage.removeItem('otp_cooldown_target');
+      }
+    }
+  }, []);
+
+  // 計時器邏輯
+  useEffect(() => {
+    if (countdown > 0) {
+      const timer = setTimeout(() => {
+        setCountdown((prev) => prev - 1);
+      }, 1000);
+      return () => clearTimeout(timer);
+    } else {
+      // 倒數結束，清除 LocalStorage
+      localStorage.removeItem('otp_cooldown_target');
+    }
+  }, [countdown]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onLogin(name, otp, apiUrl);
+  };
+
+  const handleLineOtp = async () => {
+    if (!name.trim()) {
+      alert("請先輸入您的姓名，系統才能找到您的 LINE ID。");
+      return;
+    }
+    
+    setIsSendingLine(true);
+    try {
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'sendLineOtp', name: name })
+      });
+      
+      const result = await response.json();
+      alert(result.message); 
+      
+      if (result.success) {
+        // 發送成功後，設定 5 分鐘 (300秒) 冷卻
+        const cooldownSeconds = 300; 
+        setCountdown(cooldownSeconds);
+        // 存入 LocalStorage: 現在時間 + 300秒
+        const targetTime = Date.now() + (cooldownSeconds * 1000);
+        localStorage.setItem('otp_cooldown_target', targetTime.toString());
+      }
+      
+    } catch (e) {
+      alert("連線錯誤，無法發送 LINE 請求。");
+    } finally {
+      setIsSendingLine(false);
+    }
+  };
+
+  // 格式化倒數時間 mm:ss
+  const formatTime = (seconds: number) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}:${s < 10 ? '0' : ''}${s}`;
   };
 
   return (
@@ -59,7 +131,6 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLogin, isLoading, errorM
             <div className="relative">
               <input
                 id="otp"
-                // Change to password type to hide characters and force English keyboard on mobile
                 type={showPassword ? "text" : "password"}
                 required
                 value={otp}
@@ -74,6 +145,40 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLogin, isLoading, errorM
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1"
               >
                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+            
+            {/* LINE 獲取驗證碼按鈕 (含冷卻機制) */}
+            <div className="flex justify-end mt-2">
+              <button 
+                type="button"
+                onClick={handleLineOtp}
+                disabled={isSendingLine || countdown > 0} // 倒數時停用按鈕
+                className={`text-xs font-bold flex items-center gap-1 transition-colors ${
+                    (isSendingLine || countdown > 0)
+                      ? "text-gray-400 cursor-not-allowed" 
+                      : "text-[#06C755] hover:text-[#05b34c]"
+                }`}
+              >
+                {isSendingLine ? (
+                  <>
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    發送中...
+                  </>
+                ) : countdown > 0 ? (
+                  <>
+                    {/* 倒數計時顯示 */}
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    請稍後 ({formatTime(countdown)}) 再試
+                  </>
+                ) : (
+                  <>
+                    <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
+                      <path d="M12 2C6.48 2 2 5.56 2 10.12c0 2.42 1.25 4.58 3.28 6.08-.14.52-.5 1.9-.57 2.22-.06.29.13.56.4.31.22-.2 2.37-2.06 2.53-2.21.03-.03.07-.05.1-.07.41.08.84.13 1.26.13 5.52 0 10-3.56 10-8.12S17.52 2 12 2z"/>
+                    </svg>
+                    獲取 LINE 驗證碼
+                  </>
+                )}
               </button>
             </div>
           </div>
@@ -99,12 +204,10 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLogin, isLoading, errorM
         </form>
       </div>
 
-      {/* 右下角 LOGO 圖片 */}
-      {/* 使用 Google Drive Thumbnail 連結格式，通常比 uc?export=view 更穩定 */}
       <img 
         src="https://drive.google.com/thumbnail?id=19Fag6zUzuv8wLA91p1X9Gtv3QdtivEFv&sz=w1000" 
         alt="PM CORE Logo"
-        className="fixed bottom-4 right-4 w-36 md:w-56 h-auto object-contain pointer-events-none z-0 opacity-100 transition-all duration-300"
+        className="fixed bottom-4 right-4 w-32 md:w-48 h-auto object-contain pointer-events-none z-0 opacity-70 transition-all duration-300"
       />
     </>
   );
