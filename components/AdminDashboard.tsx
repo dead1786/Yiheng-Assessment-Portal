@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { User, AssessmentRecord, Employee } from '../types';
 import { fetchAdminData, updateAdminPassword, submitAdminReview, fetchEmployeeList, updateEmployeeList } from '../services/api';
-import { LogOut, Users, Save, Loader2, RefreshCw, KeyRound, MessageSquare, Calculator, X, Link, UserPlus, Trash2 } from 'lucide-react';
+import { LogOut, Users, Save, Loader2, RefreshCw, KeyRound, MessageSquare, Calculator, X, Link, UserPlus, Trash2, Ban } from 'lucide-react';
 
 interface AdminDashboardProps {
   user: User;
@@ -10,7 +10,7 @@ interface AdminDashboardProps {
 }
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, onLogout }) => {
-  const [activeTab, setActiveTab] = useState<'records' | 'employees' | 'security'>('records');
+  const [activeTab, setActiveTab] = useState<'records' | 'employees' | 'security'>('employees');
   const [records, setRecords] = useState<AssessmentRecord[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -49,6 +49,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
     setEmployees(newEmployees);
   };
 
+  const handleKickUser = (index: number, name: string) => {
+      if (confirm(`確定要強制踢出「${name}」嗎？\n這將取消他的登入權限(Permission)，需按下儲存才生效。`)) {
+          handleEmployeeChange(index, 'permission', false);
+      }
+  };
+
   const handleAddEmployee = () => {
     setEmployees([...employees, {
       name: '新員工',
@@ -64,8 +70,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
   };
 
   const handleDeleteEmployee = (index: number) => {
-    const newEmployees = employees.filter((_, i) => i !== index);
-    setEmployees(newEmployees);
+    if(confirm('確定要刪除此員工資料嗎？')) {
+        const newEmployees = employees.filter((_, i) => i !== index);
+        setEmployees(newEmployees);
+    }
   };
 
   const handleSaveEmployees = async () => {
@@ -137,7 +145,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
     if (!selectedRecord) return 0;
     const ai = selectedRecord.aiScore || 0;
     const admin = parseInt(adminReview.score) || 0;
-    // 修改: 權重 6:4
     return Math.round(ai * 0.6 + admin * 0.4);
   };
 
@@ -179,20 +186,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
 
       <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
         <button
-          onClick={() => setActiveTab('records')}
-          className={`px-5 py-2.5 rounded-lg font-medium transition-all whitespace-nowrap ${
-            activeTab === 'records' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-gray-600 hover:bg-gray-50'
-          }`}
-        >
-          員工填答狀況
-        </button>
-        <button
           onClick={() => setActiveTab('employees')}
           className={`px-5 py-2.5 rounded-lg font-medium transition-all whitespace-nowrap ${
             activeTab === 'employees' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-gray-600 hover:bg-gray-50'
           }`}
         >
           員工管理
+        </button>
+        <button
+          onClick={() => setActiveTab('records')}
+          className={`px-5 py-2.5 rounded-lg font-medium transition-all whitespace-nowrap ${
+            activeTab === 'records' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-gray-600 hover:bg-gray-50'
+          }`}
+        >
+          員工填答狀況
         </button>
         <button
           onClick={() => setActiveTab('security')}
@@ -287,110 +294,131 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
           
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-gray-50 text-gray-700 border-b border-gray-200 whitespace-nowrap">
-                  <th className="p-3 text-center">姓名</th>
-                  <th className="p-3 text-center">到職日</th>
-                  <th className="p-3 text-center">職稱</th>
-                  <th className="p-3 text-center">年資</th>
-                  <th className="p-3 text-center">職等</th>
-                  <th className="p-3 text-center">職等加給</th>
-                  <th className="p-3 text-center">KPI</th>
-                  <th className="p-3 text-center">薪資</th>
-                  <th className="p-3 text-center">授權</th>
-                  <th className="p-3 text-center"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {employees.map((emp, index) => (
-                  <tr key={index} className="border-b border-gray-100 hover:bg-gray-50">
-                    <td className="p-2 min-w-[100px]">
-                      <input 
-                        type="text" 
-                        value={emp.name}
-                        onChange={(e) => handleEmployeeChange(index, 'name', e.target.value)}
-                        className="w-full px-2 py-1 border border-gray-200 rounded focus:ring-2 focus:ring-blue-500 outline-none text-center"
-                      />
-                    </td>
-                    <td className="p-2 w-[80px]">
-                      <input 
-                        type="text" 
-                        value={emp.kpi || ''} // 如果沒有資料就顯示空白
-                        disabled // 🔒 關鍵：鎖定不給改
-                        className="w-full px-2 py-1 border border-gray-200 rounded bg-gray-100 text-gray-500 cursor-not-allowed outline-none text-center font-bold"
-                        // bg-gray-100 讓它看起來灰灰的，暗示不能點
-                      />
-                    </td>
-                    <td className="p-2 min-w-[120px]">
-                      <input 
-                        type="text" 
-                        value={emp.joinDate}
-                        onChange={(e) => handleEmployeeChange(index, 'joinDate', e.target.value)}
-                        className="w-full px-2 py-1 border border-gray-200 rounded focus:ring-2 focus:ring-blue-500 outline-none text-center"
-                        placeholder="YYYY/M/D"
-                      />
-                    </td>
-                    <td className="p-2 min-w-[100px]">
-                      <input 
-                        type="text" 
-                        value={emp.jobTitle}
-                        onChange={(e) => handleEmployeeChange(index, 'jobTitle', e.target.value)}
-                        className="w-full px-2 py-1 border border-gray-200 rounded focus:ring-2 focus:ring-blue-500 outline-none text-center"
-                      />
-                    </td>
-                    <td className="p-2 w-[80px]">
-                      <input 
-                        type="text" 
-                        value={emp.yearsOfService}
-                        disabled
-                        className="w-full px-2 py-1 border border-gray-200 rounded bg-gray-100 text-gray-500 cursor-not-allowed outline-none text-center"
-                      />
-                    </td>
-                    <td className="p-2 w-[80px]">
-                      <input 
-                        type="text" 
-                        value={emp.jobGrade}
-                        onChange={(e) => handleEmployeeChange(index, 'jobGrade', e.target.value)}
-                        className="w-full px-2 py-1 border border-gray-200 rounded focus:ring-2 focus:ring-blue-500 outline-none text-center"
-                      />
-                    </td>
-                    <td className="p-2 min-w-[100px]">
-                      <input 
-                        type="text" 
-                        value={emp.jobGradeBonus}
-                        onChange={(e) => handleEmployeeChange(index, 'jobGradeBonus', e.target.value)}
-                        className="w-full px-2 py-1 border border-gray-200 rounded focus:ring-2 focus:ring-blue-500 outline-none text-center"
-                      />
-                    </td>
-                    <td className="p-2 min-w-[100px]">
-                      <input 
-                        type="text" 
-                        value={emp.salary}
-                        disabled
-                        className="w-full px-2 py-1 border border-gray-200 rounded bg-gray-100 text-gray-500 cursor-not-allowed outline-none text-center"
-                      />
-                    </td>
-                    <td className="p-2 text-center w-[60px]">
-                      <input 
-                        type="checkbox" 
-                        checked={emp.permission}
-                        onChange={(e) => handleEmployeeChange(index, 'permission', e.target.checked)}
-                        className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500"
-                      />
-                    </td>
-                    <td className="p-2 text-center w-[50px]">
-                      <button 
-                        onClick={() => handleDeleteEmployee(index)}
-                        className="p-1.5 text-red-500 hover:bg-red-50 rounded-full transition-colors"
-                        title="刪除"
-                      >
-                        <Trash2 size={18} />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+  <thead>
+    <tr className="bg-gray-50 text-gray-700 border-b border-gray-200 whitespace-nowrap">
+      <th className="p-3 text-center w-16">管理</th>
+      <th className="p-3 text-center">姓名</th>
+      <th className="p-3 text-center">到職日</th>
+      <th className="p-3 text-center">職稱</th>
+      <th className="p-3 text-center">年資</th>
+      <th className="p-3 text-center">職等</th>
+      <th className="p-3 text-center">職等加給</th>
+      <th className="p-3 text-center">KPI</th>
+      <th className="p-3 text-center">薪資</th>
+      <th className="p-3 text-center">授權</th>
+      <th className="p-3 text-center"></th>
+    </tr>
+  </thead>
+  <tbody>
+    {employees.map((emp, index) => (
+      <tr key={index} className="border-b border-gray-100 hover:bg-gray-50">
+        <td className="p-2 text-center">
+            <button 
+                onClick={() => handleKickUser(index, emp.name)}
+                title="強制踢出 (取消授權)"
+                className="p-1.5 bg-red-100 text-red-600 hover:bg-red-200 rounded-lg transition-colors"
+            >
+                <Ban size={16} />
+            </button>
+        </td>
+
+        <td className="p-2 min-w-[100px]">
+          <input 
+            type="text" 
+            value={emp.name}
+            onChange={(e) => handleEmployeeChange(index, 'name', e.target.value)}
+            className="w-full px-2 py-1 border border-gray-200 rounded focus:ring-2 focus:ring-blue-500 outline-none text-center"
+          />
+        </td>
+
+        <td className="p-2 min-w-[120px]">
+          <input 
+            type="text" 
+            value={emp.joinDate}
+            onChange={(e) => handleEmployeeChange(index, 'joinDate', e.target.value)}
+            className="w-full px-2 py-1 border border-gray-200 rounded focus:ring-2 focus:ring-blue-500 outline-none text-center"
+            placeholder="YYYY/M/D"
+          />
+        </td>
+
+        <td className="p-2 min-w-[100px]">
+          <input 
+            type="text" 
+            value={emp.jobTitle}
+            onChange={(e) => handleEmployeeChange(index, 'jobTitle', e.target.value)}
+            className="w-full px-2 py-1 border border-gray-200 rounded focus:ring-2 focus:ring-blue-500 outline-none text-center"
+          />
+        </td>
+
+        <td className="p-2 w-[80px]">
+          <input 
+            type="text" 
+            value={emp.yearsOfService}
+            disabled
+            className="w-full px-2 py-1 border border-gray-200 rounded bg-gray-100 text-gray-500 cursor-not-allowed outline-none text-center"
+          />
+        </td>
+
+        <td className="p-2 w-[80px]">
+          <input 
+            type="text" 
+            value={emp.jobGrade}
+            onChange={(e) => handleEmployeeChange(index, 'jobGrade', e.target.value)}
+            className="w-full px-2 py-1 border border-gray-200 rounded focus:ring-2 focus:ring-blue-500 outline-none text-center"
+          />
+        </td>
+
+        <td className="p-2 min-w-[100px]">
+          <input 
+            type="text" 
+            value={emp.jobGradeBonus}
+            onChange={(e) => handleEmployeeChange(index, 'jobGradeBonus', e.target.value)}
+            className="w-full px-2 py-1 border border-gray-200 rounded focus:ring-2 focus:ring-blue-500 outline-none text-center"
+          />
+        </td>
+
+        {/* ✅ 修改：KPI 欄位加寬 (w-[80px] -> min-w-[120px]) */}
+        <td className="p-2 min-w-[120px]">
+          <input 
+            type="text" 
+            value={emp.kpi || ''}
+            disabled 
+            className="w-full px-2 py-1 border border-gray-200 rounded bg-gray-200 text-gray-600 font-bold cursor-not-allowed outline-none text-center"
+          />
+        </td>
+
+        {/* ✅ 修改：薪資欄位縮窄 (min-w-[100px] -> w-[90px]) */}
+        <td className="p-2 w-[90px]">
+          <input 
+            type="text" 
+            value={emp.salary}
+            disabled
+            className="w-full px-2 py-1 border border-gray-200 rounded bg-gray-100 text-gray-500 cursor-not-allowed outline-none text-center"
+          />
+        </td>
+
+        <td className="p-2 text-center w-[60px]">
+          <input 
+            type="checkbox" 
+            checked={emp.permission}
+            onChange={(e) => handleEmployeeChange(index, 'permission', e.target.checked)}
+            className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500"
+          />
+        </td>
+
+        <td className="p-2 text-center w-[50px]">
+          <button 
+            onClick={() => handleDeleteEmployee(index)}
+            className="p-1.5 text-red-500 hover:bg-red-50 rounded-full transition-colors"
+            title="刪除"
+          >
+            <Trash2 size={18} />
+          </button>
+        </td>
+      </tr>
+    ))}
+  </tbody>
+</table>
           </div>
 
           <div className="mt-6 border-t border-gray-100 pt-6">
@@ -406,7 +434,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
         </div>
       ) : (
         <div className="grid md:grid-cols-2 gap-8">
-          {/* Password Change Section */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
             <div className="flex items-center gap-3 mb-6 text-gray-800">
               <KeyRound className="text-blue-600" />
@@ -433,7 +460,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
             </div>
           </div>
 
-          {/* API URL Config Section */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
             <div className="flex items-center gap-3 mb-6 text-gray-800">
               <Link className="text-purple-600" />
@@ -465,7 +491,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
         </div>
       )}
 
-      {/* Detail & Review Modal */}
       {selectedRecord && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto flex flex-col">
@@ -489,7 +514,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
             </div>
 
             <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-8">
-              {/* Left Column: Q&A */}
               <div className="space-y-6">
                 <h4 className="font-bold text-gray-700 border-l-4 border-blue-500 pl-3">員工回答</h4>
                 {selectedRecord.answers.map((ans, i) => (
@@ -500,7 +524,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
                 ))}
               </div>
 
-              {/* Right Column: Scoring */}
               <div className="space-y-6">
                 <h4 className="font-bold text-gray-700 border-l-4 border-purple-500 pl-3">AI 評估結果</h4>
                 <div className="bg-purple-50 p-5 rounded-xl border border-purple-100">
@@ -510,7 +533,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
                     </span>
                     <span className="text-2xl font-bold text-purple-700">{selectedRecord.aiScore}</span>
                   </div>
-                  {/* 加入 whitespace-pre-wrap 讓 Modal 內的評語也正確換行 */}
                   <p className="text-sm text-gray-700 leading-relaxed bg-white p-3 rounded-lg border border-purple-100 whitespace-pre-wrap">
                     {selectedRecord.aiComment}
                   </p>

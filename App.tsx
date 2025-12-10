@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
+// 📂 請覆蓋 App.tsx
+import React, { useState, useEffect } from 'react';
 import { LoginForm } from './components/LoginForm';
 import { AssessmentPlaceholder } from './components/AssessmentPlaceholder';
 import { AssessmentForm } from './components/AssessmentForm';
-import { AdminDashboard } from './components/AdminDashboard';
+// ✅ 修正點：這裡必須用 { } 因為 AdminDashboard 是具名匯出
+import { AdminDashboard } from './components/AdminDashboard'; 
 import { HistoryView } from './components/HistoryView';
 import { ProfileView } from './components/ProfileView';
 import { ScheduleView } from './components/ScheduleView';
@@ -17,16 +19,44 @@ const App: React.FC = () => {
   const [apiUrl, setApiUrl] = useState('');
   const [questions, setQuestions] = useState<string[]>([]);
 
+  // ✅ 新增：15天免登入邏輯 (App 啟動時執行)
+  useEffect(() => {
+    const checkSession = () => {
+      const savedSession = localStorage.getItem('app_session');
+      const savedApiUrl = localStorage.getItem('gas_api_url'); // 確保 URL 也被記住
+      
+      if (savedApiUrl) setApiUrl(savedApiUrl);
+
+      if (savedSession) {
+        try {
+          const sessionData = JSON.parse(savedSession);
+          // 檢查是否過期 (15天)
+          if (Date.now() < sessionData.expiry) {
+            setUser(sessionData.user);
+            // 如果有題目緩存也可以讀取，這裡先簡化
+            console.log('✅ 自動登入成功');
+          } else {
+            localStorage.removeItem('app_session'); // 過期清除
+          }
+        } catch (e) {
+          localStorage.removeItem('app_session');
+        }
+      }
+    };
+    checkSession();
+  }, []);
+
   const handleLogin = async (name: string, otp: string, url: string) => {
     setIsLoading(true);
     setError(null);
     setApiUrl(url);
+    localStorage.setItem('gas_api_url', url); // 記住 API URL
 
     try {
       const response = await authenticateEmployee(url, name, otp);
       
       if (response.success) {
-        setUser({ 
+        const userData: User = { 
           name, 
           isAdmin: response.isAdmin || false,
           canAssess: response.canAssess || false, 
@@ -35,7 +65,16 @@ const App: React.FC = () => {
           yearsOfService: response.userDetails?.yearsOfService,
           kpi: response.userDetails?.kpi, 
           joinDate: response.userDetails?.joinDate
-        });
+        };
+
+        setUser(userData);
+        
+        // ✅ 新增：寫入 Session (15天效期)
+        const expiryTime = Date.now() + (15 * 24 * 60 * 60 * 1000);
+        localStorage.setItem('app_session', JSON.stringify({
+          user: userData,
+          expiry: expiryTime
+        }));
         
         if (response.questions && response.questions.length > 0) {
           setQuestions(response.questions);
@@ -62,14 +101,22 @@ const App: React.FC = () => {
     setUser(null);
     setError(null);
     setView('dashboard');
+    localStorage.removeItem('app_session'); // ✅ 登出時清除 Session
   };
 
-  // 新增：當考核提交成功後，強制把使用者的權限改為 false
   const handleAssessmentSuccess = () => {
     if (user) {
-      setUser({ ...user, canAssess: false }); // 關鍵：立刻關閉權限
+      const updatedUser = { ...user, canAssess: false };
+      setUser(updatedUser);
+      // 更新 Session 裡的狀態
+      const savedSession = localStorage.getItem('app_session');
+      if (savedSession) {
+         const sessionData = JSON.parse(savedSession);
+         sessionData.user = updatedUser;
+         localStorage.setItem('app_session', JSON.stringify(sessionData));
+      }
     }
-    setView('dashboard'); // 回到儀表板
+    setView('dashboard');
   };
 
   const renderContent = () => {
@@ -99,7 +146,7 @@ const App: React.FC = () => {
           <AssessmentForm 
             user={user}
             onBack={() => setView('dashboard')}
-            onSuccess={handleAssessmentSuccess} // 傳遞新的成功回調
+            onSuccess={handleAssessmentSuccess}
             questions={questions}
             apiUrl={apiUrl}
           />
