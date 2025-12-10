@@ -72,8 +72,8 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLogin, isLoading, errorM
       alert(result.message); 
       
       if (result.success) {
-        // 發送成功後，設定 5 分鐘 (300秒) 冷卻
-        const cooldownSeconds = 300; 
+        // 發送成功後，設定 1 分鐘 (60秒) 冷卻
+        const cooldownSeconds = 60; 
         setCountdown(cooldownSeconds);
         // 存入 LocalStorage: 現在時間 + 300秒
         const targetTime = Date.now() + (cooldownSeconds * 1000);

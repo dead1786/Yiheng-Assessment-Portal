@@ -16,8 +16,11 @@ const App: React.FC = () => {
   const [view, setView] = useState<'dashboard' | 'form' | 'history' | 'profile' | 'schedule'>('dashboard');
   const [apiUrl, setApiUrl] = useState('');
   const [questions, setQuestions] = useState<string[]>([]);
+  
+  // ✅ 新增：Debug 狀態，用來顯示在畫面上
+  const [debugInfo, setDebugInfo] = useState<string>("系統監控中...");
 
-  // 1. 初始化檢查 (網頁剛開時)
+  // 1. 初始化檢查
   useEffect(() => {
     const initCheck = () => {
       const savedSession = localStorage.getItem('app_session');
@@ -28,15 +31,14 @@ const App: React.FC = () => {
       if (savedSession) {
         try {
           const sessionData = JSON.parse(savedSession);
-          // 檢查是否過期 (15天)
           if (Date.now() < sessionData.expiry) {
-            console.log('🔄 偵測到有效 Session，自動登入中...');
+            console.log('🔄 Session 有效，自動還原登入狀態');
             setUser(sessionData.user);
             if (sessionData.questions && sessionData.questions.length > 0) {
                 setQuestions(sessionData.questions);
             }
           } else {
-            console.log('⚠️ Session 已過期，清除紀錄');
+            console.log('⚠️ Session 已過期');
             localStorage.removeItem('app_session'); 
           }
         } catch (e) {
@@ -47,40 +49,54 @@ const App: React.FC = () => {
     initCheck();
   }, []);
 
-  // ✅ 2. 核心修正：每 5 秒檢查一次是否被踢出 (Heartbeat)
+  // 2. 狀態檢查 (Heartbeat) - 將結果顯示在 Debug Panel
   useEffect(() => {
-    // 如果沒登入或網址未設定，就不檢查
-    if (!user || !apiUrl) return;
-    
-    // 如果是管理員，也不用檢查被踢狀態
-    if (user.isAdmin) return;
+    if (!user || !apiUrl || user.isAdmin) return;
 
-    const timer = setInterval(() => {
+    const checkStatus = () => {
         const savedSession = localStorage.getItem('app_session');
         if (savedSession) {
             try {
                 const sessionData = JSON.parse(savedSession);
                 const loginTime = sessionData.loginTime || 0;
                 
-                // 背景呼叫 API 確認狀態
                 checkLoginStatus(apiUrl, user.name, loginTime)
-                    .then(res => {
+                    .then((res: any) => {
+                        // 建構 Debug 訊息
+                        let statusMsg = `API 連線: ${res.success ? "✅ 成功" : "❌ 失敗"}`;
+                        if (!res.success && res.message) statusMsg += ` (${res.message})`;
+                        
+                        // 顯示時間比對 (方便除錯)
+                        const myTime = new Date(loginTime).toLocaleTimeString();
+                        
+                        // 若被踢出
                         if (res.success && res.kicked) {
-                            // 發現被踢，立刻登出
+                            setDebugInfo(`${statusMsg}\n狀態: 🚨 KICKED (被踢出)\n登入: ${myTime}\n指令: 已接收`);
                             alert("⚠️ 您的帳號已被管理員強制登出，請重新驗證。");
                             handleLogout();
+                        } else {
+                            // 正常狀態
+                            setDebugInfo(`${statusMsg}\n狀態: 🟢 Online (正常)\n登入: ${myTime}\n檢查: ${new Date().toLocaleTimeString()}`);
                         }
                     })
-                    .catch(err => console.error("狀態檢查失敗(可能是網路問題)", err));
+                    .catch(err => {
+                        setDebugInfo(`❌ 連線錯誤: ${err.message || "Unknown Error"}`);
+                    });
             } catch (e) {
-                console.error("Session 讀取錯誤");
+                setDebugInfo("❌ Session 讀取錯誤");
             }
+        } else {
+             setDebugInfo("⚠️ 無 Session 資料");
         }
-    }, 5000); // 每 5000 毫秒 (5秒) 檢查一次
+    };
 
-    // 當元件卸載或 user 改變時，清除計時器
+    // 立即檢查一次
+    checkStatus();
+
+    // 每 5 秒檢查一次
+    const timer = setInterval(checkStatus, 5000);
     return () => clearInterval(timer);
-  }, [user, apiUrl]); // 依賴 user 和 apiUrl，有變動會重設計時器
+  }, [user, apiUrl]);
 
   const handleLogin = async (name: string, otp: string, url: string) => {
     setIsLoading(true);
@@ -120,7 +136,7 @@ const App: React.FC = () => {
           user: userData,
           questions: loadedQuestions,
           expiry: expiryTime,
-          loginTime: now 
+          loginTime: now // 比對踢出時間的關鍵
         }));
         
         setView('dashboard');
@@ -236,6 +252,14 @@ const App: React.FC = () => {
       <div className="w-full flex justify-center">
         {renderContent()}
       </div>
+      
+      {/* ✅ 新增：系統狀態監控面板 (Debug Panel) */}
+      {user && !user.isAdmin && (
+          <div className="fixed bottom-2 left-2 bg-black/80 text-green-400 p-3 rounded-lg text-xs font-mono z-50 shadow-lg pointer-events-none whitespace-pre-wrap border border-green-800">
+              <div className="font-bold border-b border-green-800 mb-1 pb-1">⚡ 系統連線監控</div>
+              {debugInfo}
+          </div>
+      )}
     </div>
   );
 };
