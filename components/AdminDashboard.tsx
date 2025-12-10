@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { User, AssessmentRecord, Employee } from '../types';
-import { fetchAdminData, updateAdminPassword, submitAdminReview, fetchEmployeeList, updateEmployeeList } from '../services/api';
+import { fetchAdminData, updateAdminPassword, submitAdminReview, fetchEmployeeList, updateEmployeeList, kickUser } from '../services/api'; // ✅ 引入 kickUser
 import { LogOut, Users, Save, Loader2, RefreshCw, KeyRound, MessageSquare, Calculator, X, Link, UserPlus, Trash2, Ban } from 'lucide-react';
 
 interface AdminDashboardProps {
@@ -49,9 +49,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
     setEmployees(newEmployees);
   };
 
-  const handleKickUser = (index: number, name: string) => {
-      if (confirm(`確定要強制踢出「${name}」嗎？\n這將取消他的登入權限(Permission)，需按下儲存才生效。`)) {
-          handleEmployeeChange(index, 'permission', false);
+  // ✅ 修正：踢人功能改為呼叫 API (不改前端狀態)
+  const handleKickUser = async (name: string) => {
+      if (confirm(`確定要強制登出「${name}」嗎？\n這將使對方目前的登入立即失效，需重新驗證 OTP 才能登入。`)) {
+          // 顯示 loading 狀態或提示
+          try {
+             const res = await kickUser(apiUrl, name);
+             if (res.success) {
+                 alert(`已成功發送強制登出指令給 ${name}。`);
+             } else {
+                 alert("指令發送失敗：" + res.message);
+             }
+          } catch(e) {
+             alert("連線錯誤，無法執行踢出。");
+          }
       }
   };
 
@@ -87,7 +98,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
       setIsSaving(false);
     }
   };
-
+  
+  // ... (其餘 handle 函式不變) ...
   const handleChangePassword = async () => {
     if (!newPassword.trim()) return alert("請輸入新密碼");
     setIsSaving(true);
@@ -218,6 +230,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
           <p className="text-gray-500">正在同步雲端資料...</p>
         </div>
       ) : activeTab === 'records' ? (
+        // ... (Records Tab 保持不變) ...
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
@@ -312,10 +325,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
   <tbody>
     {employees.map((emp, index) => (
       <tr key={index} className="border-b border-gray-100 hover:bg-gray-50">
+        {/* ✅ 修改：踢人按鈕 (純呼叫 API，不影響 Permission 欄位) */}
         <td className="p-2 text-center">
             <button 
-                onClick={() => handleKickUser(index, emp.name)}
-                title="強制踢出 (取消授權)"
+                onClick={() => handleKickUser(emp.name)}
+                title="強制踢出 (讓登入失效)"
                 className="p-1.5 bg-red-100 text-red-600 hover:bg-red-200 rounded-lg transition-colors"
             >
                 <Ban size={16} />
@@ -330,7 +344,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
             className="w-full px-2 py-1 border border-gray-200 rounded focus:ring-2 focus:ring-blue-500 outline-none text-center"
           />
         </td>
-
+        
+        {/* ... (中間欄位保持不變, 記得保留 KPI/薪資 的寬度設定) ... */}
         <td className="p-2 min-w-[120px]">
           <input 
             type="text" 
@@ -377,7 +392,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
           />
         </td>
 
-        {/* ✅ 修改：KPI 欄位加寬 (w-[80px] -> min-w-[120px]) */}
         <td className="p-2 min-w-[120px]">
           <input 
             type="text" 
@@ -387,7 +401,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
           />
         </td>
 
-        {/* ✅ 修改：薪資欄位縮窄 (min-w-[100px] -> w-[90px]) */}
         <td className="p-2 w-[90px]">
           <input 
             type="text" 
@@ -397,6 +410,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
           />
         </td>
 
+        {/* 授權欄位 (這個才是控制 Checkbox) */}
         <td className="p-2 text-center w-[60px]">
           <input 
             type="checkbox" 
@@ -434,7 +448,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
         </div>
       ) : (
         <div className="grid md:grid-cols-2 gap-8">
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
+            {/* 系統設定 Tab 內容保持不變 */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
             <div className="flex items-center gap-3 mb-6 text-gray-800">
               <KeyRound className="text-blue-600" />
               <h2 className="text-xl font-bold">修改管理員密碼</h2>
@@ -492,7 +507,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
       )}
 
       {selectedRecord && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
+        // ... (Modal 內容保持不變) ...
+         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto flex flex-col">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50 sticky top-0">
               <div>

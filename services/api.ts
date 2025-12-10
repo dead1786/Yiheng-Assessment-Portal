@@ -60,7 +60,7 @@ export const submitAssessment = async (
     name: string,
     answers: string[],
     userDetails?: { jobTitle?: string, jobGrade?: string, yearsOfService?: string },
-    questions?: string[] // 新增參數: 題目
+    questions?: string[]
   ): Promise<{ success: boolean; message: string }> => {
     try {
       return await apiRequest(apiUrl, {
@@ -70,7 +70,7 @@ export const submitAssessment = async (
         jobTitle: userDetails?.jobTitle || "",
         jobGrade: userDetails?.jobGrade || "",
         yearsOfService: userDetails?.yearsOfService || "",
-        questions: questions || [] // 傳遞題目
+        questions: questions || []
       });
     } catch (error) {
       console.error("Submit Error:", error);
@@ -195,4 +195,37 @@ export const fetchShiftSchedule = async (
   } catch (error) {
     return { success: false, shifts: [], message: "無法載入班表" };
   }
+};
+
+// ✅ 新增：強制踢出 API
+export const kickUser = async (
+    apiUrl: string,
+    name: string
+): Promise<{ success: boolean; message: string }> => {
+    try {
+        return await apiRequest(apiUrl, {
+            action: 'kickUser',
+            name
+        });
+    } catch (error) {
+        return { success: false, message: "踢出指令發送失敗" };
+    }
+};
+
+// ✅ 新增：檢查登入狀態 API (確認是否被踢)
+export const checkLoginStatus = async (
+    apiUrl: string,
+    name: string,
+    sessionTime: number
+): Promise<{ success: boolean; kicked: boolean; message?: string }> => {
+    try {
+        return await apiRequest(apiUrl, {
+            action: 'checkLoginStatus',
+            name,
+            sessionTime
+        });
+    } catch (error) {
+        // 若連線失敗，預設不踢出，避免網路波動影響使用
+        return { success: false, kicked: false }; 
+    }
 };
