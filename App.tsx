@@ -6,7 +6,7 @@ import { AdminDashboard } from './components/AdminDashboard';
 import { HistoryView } from './components/HistoryView';
 import { ProfileView } from './components/ProfileView';
 import { ScheduleView } from './components/ScheduleView';
-import { authenticateEmployee, checkLoginStatus } from './services/api'; // ✅ 引入 checkLoginStatus
+import { authenticateEmployee, checkLoginStatus } from './services/api'; 
 import { User } from './types';
 
 const App: React.FC = () => {
@@ -17,8 +17,9 @@ const App: React.FC = () => {
   const [apiUrl, setApiUrl] = useState('');
   const [questions, setQuestions] = useState<string[]>([]);
 
+  // 1. 初始化檢查 (網頁剛開時)
   useEffect(() => {
-    const checkSession = async () => {
+    const initCheck = () => {
       const savedSession = localStorage.getItem('app_session');
       const savedApiUrl = localStorage.getItem('gas_api_url'); 
       
@@ -30,38 +31,56 @@ const App: React.FC = () => {
           // 檢查是否過期 (15天)
           if (Date.now() < sessionData.expiry) {
             console.log('🔄 偵測到有效 Session，自動登入中...');
-            
-            // 先讓用戶進去 (UI 體驗流暢)
             setUser(sessionData.user);
             if (sessionData.questions && sessionData.questions.length > 0) {
                 setQuestions(sessionData.questions);
             }
-
-            // ✅ 背景檢查：是否被踢出 (如果有 API URL)
-            if (savedApiUrl && sessionData.user && !sessionData.user.isAdmin) {
-                const loginTime = sessionData.loginTime || 0; // 必須要有登入時間
-                checkLoginStatus(savedApiUrl, sessionData.user.name, loginTime)
-                    .then(result => {
-                        if (result.success && result.kicked) {
-                            console.warn("⚠️ 此帳號已被管理員強制登出");
-                            alert("您的登入狀態已失效 (被強制登出)，請重新進行驗證。");
-                            handleLogout();
-                        }
-                    });
-            }
-
           } else {
             console.log('⚠️ Session 已過期，清除紀錄');
             localStorage.removeItem('app_session'); 
           }
         } catch (e) {
-          console.error('Session 解析失敗', e);
           localStorage.removeItem('app_session');
         }
       }
     };
-    checkSession();
+    initCheck();
   }, []);
+
+  // ✅ 2. 核心修正：每 5 秒檢查一次是否被踢出 (Heartbeat)
+  useEffect(() => {
+    // 如果沒登入或網址未設定，就不檢查
+    if (!user || !apiUrl) return;
+    
+    // 如果是管理員，也不用檢查被踢狀態
+    if (user.isAdmin) return;
+
+    const timer = setInterval(() => {
+        const savedSession = localStorage.getItem('app_session');
+        if (savedSession) {
+            try {
+                const sessionData = JSON.parse(savedSession);
+                const loginTime = sessionData.loginTime || 0;
+                
+                // 背景呼叫 API 確認狀態
+                checkLoginStatus(apiUrl, user.name, loginTime)
+                    .then(res => {
+                        if (res.success && res.kicked) {
+                            // 發現被踢，立刻登出
+                            alert("⚠️ 您的帳號已被管理員強制登出，請重新驗證。");
+                            handleLogout();
+                        }
+                    })
+                    .catch(err => console.error("狀態檢查失敗(可能是網路問題)", err));
+            } catch (e) {
+                console.error("Session 讀取錯誤");
+            }
+        }
+    }, 5000); // 每 5000 毫秒 (5秒) 檢查一次
+
+    // 當元件卸載或 user 改變時，清除計時器
+    return () => clearInterval(timer);
+  }, [user, apiUrl]); // 依賴 user 和 apiUrl，有變動會重設計時器
 
   const handleLogin = async (name: string, otp: string, url: string) => {
     setIsLoading(true);
@@ -95,14 +114,13 @@ const App: React.FC = () => {
         setUser(userData);
         setQuestions(loadedQuestions);
         
-        // ✅ 修正：存入 loginTime (當下時間)，用來跟後端的 "踢出時間" 比對
         const now = Date.now();
         const expiryTime = now + (15 * 24 * 60 * 60 * 1000);
         localStorage.setItem('app_session', JSON.stringify({
           user: userData,
           questions: loadedQuestions,
           expiry: expiryTime,
-          loginTime: now // 關鍵欄位
+          loginTime: now 
         }));
         
         setView('dashboard');
