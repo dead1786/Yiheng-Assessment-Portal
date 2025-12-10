@@ -17,8 +17,8 @@ const App: React.FC = () => {
   const [apiUrl, setApiUrl] = useState('');
   const [questions, setQuestions] = useState<string[]>([]);
   
-  // ✅ 新增：Debug 狀態，用來顯示在畫面上
-  const [debugInfo, setDebugInfo] = useState<string>("系統監控中...");
+  // Debug 狀態
+  const [debugInfo, setDebugInfo] = useState<string>("連線檢查中...");
 
   // 1. 初始化檢查
   useEffect(() => {
@@ -49,7 +49,7 @@ const App: React.FC = () => {
     initCheck();
   }, []);
 
-  // 2. 狀態檢查 (Heartbeat) - 將結果顯示在 Debug Panel
+  // 2. 狀態檢查 (Heartbeat) - 極簡化顯示
   useEffect(() => {
     if (!user || !apiUrl || user.isAdmin) return;
 
@@ -62,31 +62,30 @@ const App: React.FC = () => {
                 
                 checkLoginStatus(apiUrl, user.name, loginTime)
                     .then((res: any) => {
-                        // 建構 Debug 訊息
-                        let statusMsg = `API 連線: ${res.success ? "✅ 成功" : "❌ 失敗"}`;
-                        if (!res.success && res.message) statusMsg += ` (${res.message})`;
+                        // 簡化顯示：只顯示連線與狀態，不顯示時間
+                        const apiStatus = res.success ? "✅ 連線正常" : "❌ 連線失敗";
                         
-                        // 顯示時間比對 (方便除錯)
-                        const myTime = new Date(loginTime).toLocaleTimeString();
-                        
-                        // 若被踢出
                         if (res.success && res.kicked) {
-                            setDebugInfo(`${statusMsg}\n狀態: 🚨 KICKED (被踢出)\n登入: ${myTime}\n指令: 已接收`);
+                            setDebugInfo(`${apiStatus}\n🔴 狀態: 已被踢出`);
                             alert("⚠️ 您的帳號已被管理員強制登出，請重新驗證。");
                             handleLogout();
                         } else {
-                            // 正常狀態
-                            setDebugInfo(`${statusMsg}\n狀態: 🟢 Online (正常)\n登入: ${myTime}\n檢查: ${new Date().toLocaleTimeString()}`);
+                            // 若後端回傳 "Unknown Action" 代表 GAS 沒發布新版
+                            if (!res.success && res.message && res.message.includes("Unknown")) {
+                                 setDebugInfo(`❌ GAS版本過舊\n(請重新發布)`);
+                            } else {
+                                 setDebugInfo(`${apiStatus}\n🟢 API 狀態: 正常`);
+                            }
                         }
                     })
                     .catch(err => {
-                        setDebugInfo(`❌ 連線錯誤: ${err.message || "Unknown Error"}`);
+                        setDebugInfo(`❌ 連線錯誤`);
                     });
             } catch (e) {
-                setDebugInfo("❌ Session 讀取錯誤");
+                setDebugInfo("❌ 資料讀取錯誤");
             }
         } else {
-             setDebugInfo("⚠️ 無 Session 資料");
+             setDebugInfo("⚠️ 無登入資料");
         }
     };
 
@@ -136,7 +135,7 @@ const App: React.FC = () => {
           user: userData,
           questions: loadedQuestions,
           expiry: expiryTime,
-          loginTime: now // 比對踢出時間的關鍵
+          loginTime: now 
         }));
         
         setView('dashboard');
@@ -253,10 +252,9 @@ const App: React.FC = () => {
         {renderContent()}
       </div>
       
-      {/* ✅ 新增：系統狀態監控面板 (Debug Panel) */}
+      {/* ✅ 監控面板：右上角，只顯示 API 連線與帳號狀態，無時間 */}
       {user && !user.isAdmin && (
-          <div className="fixed bottom-2 left-2 bg-black/80 text-green-400 p-3 rounded-lg text-xs font-mono z-50 shadow-lg pointer-events-none whitespace-pre-wrap border border-green-800">
-              <div className="font-bold border-b border-green-800 mb-1 pb-1">⚡ 系統連線監控</div>
+          <div className="fixed top-20 right-2 bg-black/80 text-green-400 p-2 rounded-lg text-[10px] font-mono z-50 shadow-lg pointer-events-none whitespace-pre-wrap border border-green-800 opacity-80">
               {debugInfo}
           </div>
       )}
