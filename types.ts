@@ -26,6 +26,7 @@ export interface Employee {
   jobGrade: string;
   jobGradeBonus: string; // 新增: 職等加給
   salary: string; 
+  kpi?: string;
   permission: boolean;
 }
 

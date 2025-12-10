@@ -57,6 +57,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
       yearsOfService: '0',
       jobGrade: '1',
       jobGradeBonus: '0',
+      kpi: '',
       salary: '0',
       permission: true
     }]);
@@ -294,6 +295,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
                   <th className="p-3 text-center">年資</th>
                   <th className="p-3 text-center">職等</th>
                   <th className="p-3 text-center">職等加給</th>
+                  <th className="p-3 text-center">KPI</th>
                   <th className="p-3 text-center">薪資</th>
                   <th className="p-3 text-center">授權</th>
                   <th className="p-3 text-center"></th>
@@ -308,6 +310,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
                         value={emp.name}
                         onChange={(e) => handleEmployeeChange(index, 'name', e.target.value)}
                         className="w-full px-2 py-1 border border-gray-200 rounded focus:ring-2 focus:ring-blue-500 outline-none text-center"
+                      />
+                    </td>
+                    <td className="p-2 w-[80px]">
+                      <input 
+                        type="text" 
+                        value={emp.kpi || ''} // 如果沒有資料就顯示空白
+                        disabled // 🔒 關鍵：鎖定不給改
+                        className="w-full px-2 py-1 border border-gray-200 rounded bg-gray-100 text-gray-500 cursor-not-allowed outline-none text-center font-bold"
+                        // bg-gray-100 讓它看起來灰灰的，暗示不能點
                       />
                     </td>
                     <td className="p-2 min-w-[120px]">
