@@ -170,12 +170,12 @@ export const submitAssessment = async (
 
   export const fetchDeficiencyRecords = async (
   apiUrl: string,
-  name: string
+  name?: string // 修改：變成可選參數
 ): Promise<{ success: boolean; records: DeficiencyRecord[]; message?: string }> => {
   try {
     return await apiRequest(apiUrl, {
       action: 'getDeficiencyRecords',
-      name
+      name: name || "" // 如果沒傳名字，就傳空字串給後端
     });
   } catch (error) {
     return { success: false, records: [], message: "無法載入缺失紀錄" };

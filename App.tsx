@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react'; // ✅ 新增 useRef
 import { LoginForm } from './components/LoginForm';
 import { AssessmentPlaceholder } from './components/AssessmentPlaceholder';
 import { AssessmentForm } from './components/AssessmentForm';
@@ -20,7 +20,10 @@ const App: React.FC = () => {
   // Debug 狀態
   const [debugInfo, setDebugInfo] = useState<string>("連線檢查中...");
 
-  // 1. 初始化檢查
+  // ✅ 新增：用來判斷是否正在「返回」(避免無窮迴圈)
+  const isPopping = useRef(false);
+
+  // ✅ 1. 初始化檢查
   useEffect(() => {
     const initCheck = () => {
       const savedSession = localStorage.getItem('app_session');
@@ -47,9 +50,51 @@ const App: React.FC = () => {
       }
     };
     initCheck();
+
+    // 🌟 初始化 History (讓第一頁變成 Dashboard)
+    window.history.replaceState({ view: 'dashboard' }, '');
   }, []);
 
-  // 2. 狀態檢查 (Heartbeat) - 極簡化顯示
+  // ✅ 2. 處理瀏覽器返回 (手勢返回)
+  useEffect(() => {
+    const handlePopState = (event: PopStateEvent) => {
+        isPopping.current = true; // 標記為正在返回，避免 useEffect 重複 push
+        if (event.state && event.state.view) {
+            setView(event.state.view);
+        } else {
+            // 如果沒有 state (例如退無可退)，預設回 Dashboard
+            setView('dashboard');
+        }
+        // 重置標記
+        setTimeout(() => { isPopping.current = false; }, 50);
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  // ✅ 3. 當 View 改變時，推入 History (除了 dashboard)
+  useEffect(() => {
+    if (isPopping.current) return; // 如果是手勢返回觸發的，不要再 push
+
+    if (view !== 'dashboard') {
+        // 進入子頁面 -> 告訴瀏覽器這是一頁 (啟用手勢返回)
+        window.history.pushState({ view }, '', `#${view}`);
+    } 
+    // 注意：回到 Dashboard 不 push，而是讓 onBack 觸發 history.back()
+  }, [view]);
+
+  // ✅ 4. 統一的返回邏輯 (給子頁面按鈕用)
+  const handleBackToDashboard = () => {
+    // 如果瀏覽器歷史紀錄顯示我們在子頁面，就用瀏覽器的 Back (這樣手勢跟按鈕才同步)
+    if (window.history.state && window.history.state.view !== 'dashboard') {
+        window.history.back();
+    } else {
+        setView('dashboard');
+    }
+  };
+
+  // 5. 狀態檢查 (Heartbeat) - 右上角
   useEffect(() => {
     if (!user || !apiUrl || user.isAdmin) return;
 
@@ -62,7 +107,6 @@ const App: React.FC = () => {
                 
                 checkLoginStatus(apiUrl, user.name, loginTime)
                     .then((res: any) => {
-                        // 簡化顯示：只顯示連線與狀態，不顯示時間
                         const apiStatus = res.success ? "✅ 連線正常" : "❌ 連線失敗";
                         
                         if (res.success && res.kicked) {
@@ -70,11 +114,10 @@ const App: React.FC = () => {
                             alert("⚠️ 您的帳號已被管理員強制登出，請重新驗證。");
                             handleLogout();
                         } else {
-                            // 若後端回傳 "Unknown Action" 代表 GAS 沒發布新版
                             if (!res.success && res.message && res.message.includes("Unknown")) {
                                  setDebugInfo(`❌ GAS版本過舊\n(請重新發布)`);
                             } else {
-                                 setDebugInfo(`${apiStatus}\n🟢 API 狀態: 正常`);
+                                 setDebugInfo(`${apiStatus}\n🟢 狀態: 線上`);
                             }
                         }
                     })
@@ -89,10 +132,7 @@ const App: React.FC = () => {
         }
     };
 
-    // 立即檢查一次
     checkStatus();
-
-    // 每 5 秒檢查一次
     const timer = setInterval(checkStatus, 5000);
     return () => clearInterval(timer);
   }, [user, apiUrl]);
@@ -138,6 +178,8 @@ const App: React.FC = () => {
           loginTime: now 
         }));
         
+        // 登入成功時，確保 History 乾淨
+        window.history.replaceState({ view: 'dashboard' }, '');
         setView('dashboard');
       } else {
         setError(response.message);
@@ -150,10 +192,15 @@ const App: React.FC = () => {
   };
 
   const handleLogout = () => {
-    setUser(null);
-    setError(null);
-    setView('dashboard');
-    localStorage.removeItem('app_session'); 
+    // 登出確認
+    if (window.confirm("確定要登出系統嗎？")) {
+        setUser(null);
+        setError(null);
+        setView('dashboard');
+        localStorage.removeItem('app_session'); 
+        // 登出後重置網址
+        window.history.replaceState(null, '', ' ');
+    }
   };
 
   const handleAssessmentSuccess = () => {
@@ -172,7 +219,8 @@ const App: React.FC = () => {
          }
       }
     }
-    setView('dashboard');
+    // 成功後返回 Dashboard
+    handleBackToDashboard();
   };
 
   const renderContent = () => {
@@ -201,7 +249,7 @@ const App: React.FC = () => {
         return (
           <AssessmentForm 
             user={user}
-            onBack={() => setView('dashboard')}
+            onBack={handleBackToDashboard} // ✅ 改用新的返回函式
             onSuccess={handleAssessmentSuccess}
             questions={questions}
             apiUrl={apiUrl}
@@ -212,7 +260,7 @@ const App: React.FC = () => {
           <HistoryView 
             user={user}
             apiUrl={apiUrl}
-            onBack={() => setView('dashboard')}
+            onBack={handleBackToDashboard} // ✅ 改用新的返回函式
           />
         );
       case 'profile':
@@ -220,7 +268,7 @@ const App: React.FC = () => {
           <ProfileView 
             user={user}
             apiUrl={apiUrl}
-            onBack={() => setView('dashboard')}
+            onBack={handleBackToDashboard} // ✅ 改用新的返回函式
           />
         );
       case 'schedule':
@@ -228,7 +276,7 @@ const App: React.FC = () => {
           <ScheduleView 
             user={user}
             apiUrl={apiUrl}
-            onBack={() => setView('dashboard')}
+            onBack={handleBackToDashboard} // ✅ 改用新的返回函式
           />
         );
       case 'dashboard':
@@ -252,7 +300,7 @@ const App: React.FC = () => {
         {renderContent()}
       </div>
       
-      {/* ✅ 監控面板：右上角，只顯示 API 連線與帳號狀態，無時間 */}
+      {/* 監控面板：右上角 */}
       {user && !user.isAdmin && (
           <div className="fixed top-20 right-2 bg-black/80 text-green-400 p-2 rounded-lg text-[10px] font-mono z-50 shadow-lg pointer-events-none whitespace-pre-wrap border border-green-800 opacity-80">
               {debugInfo}

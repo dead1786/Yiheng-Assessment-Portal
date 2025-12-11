@@ -65,6 +65,7 @@ export interface EmployeeListResponse {
 }
 
 export interface DeficiencyRecord {
+  name?: string;
   station: string;
   date: string;
   status: string;
