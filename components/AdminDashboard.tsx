@@ -10,12 +10,11 @@ interface AdminDashboardProps {
 }
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, onLogout }) => {
-  // 新增 deficiencies Tab
   const [activeTab, setActiveTab] = useState<'records' | 'employees' | 'security' | 'deficiencies'>('employees');
   
   const [records, setRecords] = useState<AssessmentRecord[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
-  const [allDeficiencies, setAllDeficiencies] = useState<DeficiencyRecord[]>([]); // 存所有缺失
+  const [allDeficiencies, setAllDeficiencies] = useState<DeficiencyRecord[]>([]); 
   
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -23,7 +22,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
   const [newPassword, setNewPassword] = useState('');
   const [configUrl, setConfigUrl] = useState(apiUrl);
   
-  // Modals
   const [selectedRecord, setSelectedRecord] = useState<AssessmentRecord | null>(null);
   const [selectedDeficiencyUser, setSelectedDeficiencyUser] = useState<{name: string, records: DeficiencyRecord[]} | null>(null);
   
@@ -38,7 +36,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
       const empData = await fetchEmployeeList(apiUrl);
       if (empData.success) setEmployees(empData.employees);
       
-      // ✅ 載入所有缺失紀錄
       const defData = await fetchDeficiencyRecords(apiUrl);
       if (defData.success) setAllDeficiencies(defData.records);
 
@@ -53,7 +50,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
     loadData();
   }, [apiUrl]);
 
-  // ... (保留原本的 handleEmployeeChange, handleKickUser 等函式) ...
   const handleEmployeeChange = (index: number, field: keyof Employee, value: any) => {
     const newEmployees = [...employees];
     newEmployees[index] = { ...newEmployees[index], [field]: value };
@@ -123,7 +119,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
     });
   };
 
-  // ✅ 開啟缺失詳情 Modal
   const openDeficiencyModal = (empName: string) => {
       const userRecords = allDeficiencies.filter(r => r.name === empName);
       setSelectedDeficiencyUser({ name: empName, records: userRecords });
@@ -155,7 +150,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
     try { return new Date(dateStr).toLocaleDateString('zh-TW'); } catch { return dateStr; }
   };
 
-  // 計算每位員工的缺失總數
   const getDeficiencyCount = (name: string) => {
       return allDeficiencies.filter(d => d.name === name).length;
   };
@@ -188,7 +182,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
         <button onClick={() => setActiveTab('records')} className={`px-5 py-2.5 rounded-lg font-medium transition-all whitespace-nowrap ${activeTab === 'records' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
           員工填答狀況
         </button>
-        {/* ✅ 新增 Tab */}
         <button onClick={() => setActiveTab('deficiencies')} className={`px-5 py-2.5 rounded-lg font-medium transition-all whitespace-nowrap flex items-center ${activeTab === 'deficiencies' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
           <AlertTriangle size={16} className="mr-2" />
           缺失紀錄
@@ -205,7 +198,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
           <p className="text-gray-500">正在同步雲端資料...</p>
         </div>
       ) : activeTab === 'records' ? (
-        // ... (Records Tab Code, same as before) ...
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
@@ -246,7 +238,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
           </div>
         </div>
       ) : activeTab === 'employees' ? (
-        // ... (Employees Tab Code, same as before) ...
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
@@ -267,8 +258,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
                 <th className="p-3 text-center">年資</th>
                 <th className="p-3 text-center">職等</th>
                 <th className="p-3 text-center">職等加給</th>
-                <th className="p-3 text-center">KPI</th>
-                <th className="p-3 text-center">薪資</th>
+                <th className="p-3 text-center min-w-[120px]">KPI</th>
+                <th className="p-3 text-center w-[90px]">薪資</th>
                 <th className="p-3 text-center">授權</th>
                 <th className="p-3 text-center"></th>
                 </tr>
@@ -301,7 +292,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
           </div>
         </div>
       ) : activeTab === 'deficiencies' ? (
-        // ✅ 新增：缺失管理頁面
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
            <div className="flex justify-between items-center mb-6">
              <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
@@ -341,9 +331,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
            </div>
         </div>
       ) : (
-        // Security Tab
         <div className="grid md:grid-cols-2 gap-8">
-            {/* ... Security content ... */}
              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
             <div className="flex items-center gap-3 mb-6 text-gray-800">
               <KeyRound className="text-blue-600" />
@@ -377,10 +365,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
         </div>
       )}
 
-      {/* ✅ Assessment Review Modal (原有) */}
       {selectedRecord && (
          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
-           {/* ... 原本的 Modal 內容 ... */}
            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto flex flex-col">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50 sticky top-0">
               <div>
@@ -397,7 +383,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
                  ))}
                </div>
                <div className="space-y-6">
-                  {/* ... Right Column Content ... */}
                   <h4 className="font-bold text-gray-700 border-l-4 border-purple-500 pl-3">AI 評估結果</h4>
                   <div className="bg-purple-50 p-5 rounded-xl border border-purple-100">
                     <div className="flex justify-between items-center mb-2"><span className="text-purple-700 font-bold flex items-center gap-2"><Calculator size={16}/> AI 評分</span><span className="text-2xl font-bold text-purple-700">{selectedRecord.aiScore}</span></div>
@@ -418,10 +403,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
          </div>
       )}
 
-      {/* ✅ 新增：Deficiency Detail Modal */}
       {selectedDeficiencyUser && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
-           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto flex flex-col">
+           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
               <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50 sticky top-0">
                  <div>
                     <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">
@@ -432,38 +416,43 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
                  </div>
                  <button onClick={() => setSelectedDeficiencyUser(null)} className="p-2 hover:bg-gray-200 rounded-full transition-colors"><X size={24} className="text-gray-500" /></button>
               </div>
-              <div className="p-6">
+              <div className="p-0 overflow-auto">
                  {selectedDeficiencyUser.records.length === 0 ? (
                     <div className="text-center py-20 text-gray-400"><p>太棒了！該員工目前無任何缺失紀錄。</p></div>
                  ) : (
                     <div className="overflow-x-auto">
                         <table className="w-full text-left text-sm border-collapse">
-                           <thead className="bg-gray-50 text-gray-700 whitespace-nowrap">
+                           <thead className="bg-gray-50 text-gray-700 whitespace-nowrap sticky top-0 z-10">
                              <tr>
-                               <th className="p-3 border-b">日期</th>
-                               <th className="p-3 border-b">站點</th>
-                               <th className="p-3 border-b">狀態</th>
-                               <th className="p-3 border-b">防護具</th>
-                               <th className="p-3 border-b">圍籬</th>
-                               <th className="p-3 border-b">清潔</th>
-                               <th className="p-3 border-b">其他</th>
+                               <th className="p-3 border-b min-w-[100px] bg-gray-50">日期</th>
+                               <th className="p-3 border-b min-w-[120px] bg-gray-50">站點</th>
+                               <th className="p-3 border-b min-w-[160px] bg-gray-50">防護及圍籬</th>
+                               <th className="p-3 border-b min-w-[160px] bg-gray-50">清潔(箱內/外)</th>
+                               <th className="p-3 border-b min-w-[100px] bg-gray-50">SOP</th>
+                               <th className="p-3 border-b min-w-[100px] bg-gray-50">GNOP</th>
+                               <th className="p-3 border-b min-w-[150px] bg-gray-50">其他</th>
                              </tr>
                            </thead>
-                           <tbody>
+                           <tbody className="divide-y divide-gray-100">
                              {selectedDeficiencyUser.records.map((rec, idx) => (
-                               <tr key={idx} className="hover:bg-gray-50 border-b border-gray-100">
+                               <tr key={idx} className="hover:bg-gray-50">
                                  <td className="p-3 font-mono text-gray-500">{formatDate(rec.date)}</td>
                                  <td className="p-3 font-medium">{rec.station}</td>
-                                 <td className="p-3">{rec.status}</td>
-                                 <td className={`p-3 ${rec.ppe.includes('不') ? 'text-red-600 font-bold' : ''}`}>{rec.ppe}</td>
-                                 <td className={`p-3 ${rec.fencing.includes('不') ? 'text-red-600 font-bold' : ''}`}>{rec.fencing}</td>
                                  <td className="p-3">
                                    <div className="flex flex-col gap-1 text-xs">
-                                     <span className={rec.boxClean.includes('不') ? 'text-red-600' : ''}>內: {rec.boxClean}</span>
-                                     <span className={rec.siteClean.includes('不') ? 'text-red-600' : ''}>外: {rec.siteClean}</span>
+                                     <span className={rec.ppe.includes('不') ? 'text-red-600 font-bold' : ''}>PPE: {rec.ppe}</span>
+                                     <span className={rec.fencing.includes('不') ? 'text-red-600 font-bold' : ''}>圍籬: {rec.fencing}</span>
                                    </div>
                                  </td>
-                                 <td className="p-3 text-gray-500">{rec.other || '-'}</td>
+                                 <td className="p-3">
+                                   <div className="flex flex-col gap-1 text-xs">
+                                     <span className={rec.boxClean.includes('不') ? 'text-red-600 font-bold' : ''}>內: {rec.boxClean}</span>
+                                     <span className={rec.siteClean.includes('不') ? 'text-red-600 font-bold' : ''}>外: {rec.siteClean}</span>
+                                   </div>
+                                 </td>
+                                 <td className={`p-3 ${rec.order.includes('不') ? 'text-red-600 font-bold' : ''}`}>{rec.order}</td>
+                                 <td className={`p-3 ${rec.gnop.includes('不') ? 'text-red-600 font-bold' : ''}`}>{rec.gnop}</td>
+                                 <td className="p-3 text-gray-600">{rec.other || '-'}</td>
                                </tr>
                              ))}
                            </tbody>
