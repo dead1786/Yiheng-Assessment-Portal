@@ -121,23 +121,24 @@ const App: React.FC = () => {
                     setUser(prev => {
                         if (!prev) return null;
                         if (
-                            prev.kpi !== res.userDetails.kpi ||
-                            prev.annualLeave !== res.userDetails.annualLeave || 
-                            prev.annualLeaveUsed !== res.userDetails.annualLeaveUsed ||
-                            prev.jobGrade !== res.userDetails.jobGrade ||
-                            prev.assignedStation !== res.userDetails.assignedStation ||
-                            prev.allowRemote !== res.userDetails.allowRemote ||
-                            prev.canAssess !== res.userDetails.permissionGranted // 同步考核權限
+                            prev.kpi !== res.userDetails?.kpi ||
+                            prev.annualLeave !== res.userDetails?.annualLeave || 
+                            prev.annualLeaveUsed !== res.userDetails?.annualLeaveUsed ||
+                            prev.jobGrade !== res.userDetails?.jobGrade ||
+                            prev.assignedStation !== res.userDetails?.assignedStation ||
+                            prev.allowRemote !== res.userDetails?.allowRemote ||
+                            prev.canAssess !== res.userDetails?.permissionGranted 
                         ) {
+                            // ✅ 修正：加上預設值，避免 undefined 錯誤
                             const updatedUser = { 
                                 ...prev, 
-                                kpi: res.userDetails.kpi,
-                                jobGrade: res.userDetails.jobGrade,
-                                annualLeave: res.userDetails.annualLeave,
-                                annualLeaveUsed: res.userDetails.annualLeaveUsed,
-                                assignedStation: res.userDetails.assignedStation,
-                                allowRemote: res.userDetails.allowRemote,
-                                canAssess: res.userDetails.permissionGranted // 同步考核權限
+                                kpi: res.userDetails?.kpi || prev.kpi,
+                                jobGrade: res.userDetails?.jobGrade || prev.jobGrade,
+                                annualLeave: res.userDetails?.annualLeave || "0",
+                                annualLeaveUsed: res.userDetails?.annualLeaveUsed || "0",
+                                assignedStation: res.userDetails?.assignedStation || "",
+                                allowRemote: res.userDetails?.allowRemote || false,
+                                canAssess: res.userDetails?.permissionGranted || false 
                             };
                             const newSession = { ...sessionData, user: updatedUser };
                             localStorage.setItem('app_session', JSON.stringify(newSession));
@@ -149,7 +150,7 @@ const App: React.FC = () => {
             }
         }
     } catch (e) { setDebugInfo("❌ 資料錯誤"); }
-  }, [user, apiUrl]); // eslint-disable-line
+  }, [user, apiUrl]); 
 
   // 手動刷新按鈕會呼叫這個
   const handleManualRefresh = async () => {
@@ -201,20 +202,21 @@ const App: React.FC = () => {
     try {
       const response = await authenticateEmployee(url, name, otp);
       if (response.success) {
+        // ✅ 修正：加上預設值，避免 undefined 錯誤
         const userData: User = { 
           name, 
           isAdmin: response.isAdmin || false, 
           canAssess: response.canAssess || false, 
-          jobTitle: response.userDetails?.jobTitle, 
-          jobGrade: response.userDetails?.jobGrade, 
-          yearsOfService: response.userDetails?.yearsOfService, 
-          kpi: response.userDetails?.kpi, 
-          joinDate: response.userDetails?.joinDate, 
+          jobTitle: response.userDetails?.jobTitle || "", 
+          jobGrade: response.userDetails?.jobGrade || "", 
+          yearsOfService: response.userDetails?.yearsOfService || "", 
+          kpi: response.userDetails?.kpi || "", 
+          joinDate: response.userDetails?.joinDate || "", 
           canEditSchedule: response.userDetails?.canEditSchedule || false,
-          annualLeave: response.userDetails?.annualLeave,
-          annualLeaveUsed: response.userDetails?.annualLeaveUsed,
-          assignedStation: response.userDetails?.assignedStation,
-          allowRemote: response.userDetails?.allowRemote
+          annualLeave: response.userDetails?.annualLeave || "0",
+          annualLeaveUsed: response.userDetails?.annualLeaveUsed || "0",
+          assignedStation: response.userDetails?.assignedStation || "",
+          allowRemote: response.userDetails?.allowRemote || false
         };
         
         const qs = response.questions && response.questions.length > 0 ? response.questions : ["..."];
