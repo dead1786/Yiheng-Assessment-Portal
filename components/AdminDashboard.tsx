@@ -55,7 +55,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
       if (schedData.success) { localStorage.setItem('admin_schedule', JSON.stringify(schedData.shifts)); }
       
       const officeRes = await fetchOfficeList(apiUrl);
-      if (officeRes.success) setAvailableOffices(officeRes.stations);
+      // ✅ 修正：使用型別斷言 (as any) 來讀取 stations，避免 TS 報錯
+      if (officeRes.success) {
+          const stations = (officeRes as any).stations || (officeRes as any).offices || [];
+          setAvailableOffices(stations);
+      }
 
     } catch (e) { console.error("Sync failed"); } 
     finally { setIsLoading(false); setIsSyncing(false); }
@@ -94,7 +98,24 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
   };
 
   const handleAddEmployee = () => {
-    const newEmp: Employee = { name: '新員工', joinDate: '', jobTitle: '職稱', yearsOfService: '0', jobGrade: '1', jobGradeBonus: '0', kpi: '', salary: '0', permission: true, color: '#ffffff', canEditSchedule: false, annualLeave: '0', annualLeaveUsed: '0' };
+    // ✅ 確保新員工物件包含所有必要欄位 (配合 types.ts)
+    const newEmp: Employee = { 
+        name: '新員工', 
+        joinDate: '', 
+        jobTitle: '職稱', 
+        yearsOfService: '0', 
+        jobGrade: '1', 
+        jobGradeBonus: '0', 
+        kpi: '', 
+        salary: '0', 
+        permission: true, 
+        color: '#ffffff', 
+        canEditSchedule: false, 
+        annualLeave: '0', 
+        annualLeaveUsed: '0',
+        assignedStation: '', 
+        allowRemote: false 
+    };
     setEmployees([...employees, newEmp]);
   };
 
