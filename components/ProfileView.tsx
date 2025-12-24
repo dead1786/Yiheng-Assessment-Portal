@@ -195,22 +195,40 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ user, apiUrl, onBack, 
           <div className="text-center py-20 text-gray-400"><p>目前沒有任何稽核紀錄。</p></div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-gray-50 text-gray-700 font-bold whitespace-nowrap">
-                <tr><th className="p-4">稽核日期</th><th className="p-4">交換站名稱</th><th className="p-4">施作狀況</th><th className="p-4">防護裝備</th><th className="p-4">圈圍架設</th><th className="p-4">清潔(箱內/現場)</th><th className="p-4">作業順序</th><th className="p-4">GNOP</th><th className="p-4 min-w-[200px]">其他問題</th></tr>
+            <table className="w-full text-left text-sm border-collapse">
+              <thead className="bg-gray-50 text-gray-700 font-bold">
+                <tr>
+                  {/* ✅ 設定欄位寬度與禁止換行 */}
+                  <th className="p-4 whitespace-nowrap w-32 border-b">稽核日期</th>
+                  <th className="p-4 whitespace-nowrap w-48 border-b">交換站名稱</th>
+                  <th className="p-4 whitespace-nowrap w-24 border-b">施作狀況</th>
+                  <th className="p-4 whitespace-nowrap w-24 border-b">防護裝備</th>
+                  <th className="p-4 whitespace-nowrap w-24 border-b">圈圍架設</th>
+                  <th className="p-4 whitespace-nowrap min-w-[200px] border-b">清潔(箱內/現場)</th>
+                  <th className="p-4 whitespace-nowrap w-24 border-b">作業順序</th>
+                  <th className="p-4 whitespace-nowrap w-24 border-b">GNOP</th>
+                  <th className="p-4 min-w-[250px] border-b">其他問題</th>
+                </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {deficiencies.map((record, idx) => (
+                {/* ✅ 新增排序：最新的日期排在第一行 */}
+                {[...deficiencies].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map((record, idx) => (
                   <tr key={idx} className="hover:bg-gray-50 transition-colors">
-                    <td className="p-4 whitespace-nowrap font-mono text-gray-500">{formatDate(record.date)}</td>
-                    <td className="p-4 font-medium text-gray-900">{record.station}</td>
-                    <td className="p-4">{record.status}</td>
-                    <td className={`p-4 ${record.ppe && record.ppe.includes('不') ? 'text-red-600 font-bold' : 'text-green-600'}`}>{record.ppe}</td>
-                    <td className={`p-4 ${record.fencing && record.fencing.includes('不') ? 'text-red-600 font-bold' : 'text-green-600'}`}>{record.fencing}</td>
-                    <td className="p-4"><div className="flex flex-col gap-1"><span className={record.boxClean && record.boxClean.includes('不') ? 'text-red-600' : ''}>內: {record.boxClean}</span><span className={record.siteClean && record.siteClean.includes('不') ? 'text-red-600' : ''}>外: {record.siteClean}</span></div></td>
-                    <td className="p-4">{record.order}</td>
-                    <td className="p-4">{record.gnop}</td>
-                    <td className="p-4 text-gray-600">{record.other}</td>
+                    <td className="p-4 whitespace-nowrap font-mono text-gray-500 align-top">{formatDate(record.date)}</td>
+                    <td className="p-4 whitespace-nowrap font-medium text-gray-900 align-top">{record.station}</td>
+                    <td className="p-4 whitespace-nowrap align-top">{record.status}</td>
+                    <td className={`p-4 whitespace-nowrap align-top ${record.ppe && record.ppe.includes('不') ? 'text-red-600 font-bold' : 'text-green-600'}`}>{record.ppe}</td>
+                    <td className={`p-4 whitespace-nowrap align-top ${record.fencing && record.fencing.includes('不') ? 'text-red-600 font-bold' : 'text-green-600'}`}>{record.fencing}</td>
+                    {/* ✅ 使用 whitespace-pre-wrap 保留資料原始換行，不再隨機切斷 */}
+                    <td className="p-4 whitespace-pre-wrap leading-relaxed align-top">
+                      <div className="flex flex-col gap-1">
+                        <span className={record.boxClean && record.boxClean.includes('不') ? 'text-red-600' : ''}>內: {record.boxClean}</span>
+                        <span className={record.siteClean && record.siteClean.includes('不') ? 'text-red-600' : ''}>外: {record.siteClean}</span>
+                      </div>
+                    </td>
+                    <td className="p-4 whitespace-nowrap align-top">{record.order}</td>
+                    <td className="p-4 whitespace-nowrap align-top">{record.gnop}</td>
+                    <td className="p-4 whitespace-pre-wrap text-gray-600 leading-relaxed align-top">{record.other}</td>
                   </tr>
                 ))}
               </tbody>
