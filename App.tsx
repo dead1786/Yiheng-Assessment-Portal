@@ -112,7 +112,7 @@ const App: React.FC = () => {
 
         if (res.success && res.kicked) { 
             setDebugInfo(`${apiStatus}\n🔴 狀態: 已被踢出`); 
-            showAlert("⚠️ 您的帳號已被管理員強制登出，請重新驗證。").then(() => handleLogout()); 
+            showAlert("⚠️ 您的帳號已登出，請重新驗證。").then(() => handleLogout()); 
         } else { 
             if (!res.success && res.message && res.message.includes("Unknown")) setDebugInfo(`❌ GAS版本過舊`); 
             else {
