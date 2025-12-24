@@ -24,15 +24,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
   const [isSaving, setIsSaving] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [configUrl, setConfigUrl] = useState(apiUrl);
-  
-  // 可用的辦公室列表
   const [availableOffices, setAvailableOffices] = useState<string[]>([]);
 
   // Modal 狀態
   const [selectedRecord, setSelectedRecord] = useState<AssessmentRecord | null>(null);
   const [selectedDeficiencyUser, setSelectedDeficiencyUser] = useState<{name: string, records: DeficiencyRecord[]} | null>(null);
   const [adminReview, setAdminReview] = useState({ comment: '', score: '' });
-
   const [managingEmployee, setManagingEmployee] = useState<Employee | null>(null);
 
   const loadData = async (forceRefresh = false) => {
@@ -55,7 +52,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
       if (schedData.success) { localStorage.setItem('admin_schedule', JSON.stringify(schedData.shifts)); }
       
       const officeRes = await fetchOfficeList(apiUrl);
-      // ✅ 修正：使用型別斷言 (as any) 來讀取 stations，避免 TS 報錯
       if (officeRes.success) {
           const stations = (officeRes as any).stations || (officeRes as any).offices || [];
           setAvailableOffices(stations);
@@ -98,23 +94,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
   };
 
   const handleAddEmployee = () => {
-    // ✅ 確保新員工物件包含所有必要欄位 (配合 types.ts)
     const newEmp: Employee = { 
-        name: '新員工', 
-        joinDate: '', 
-        jobTitle: '職稱', 
-        yearsOfService: '0', 
-        jobGrade: '1', 
-        jobGradeBonus: '0', 
-        kpi: '', 
-        salary: '0', 
-        permission: true, 
-        color: '#ffffff', 
-        canEditSchedule: false, 
-        annualLeave: '0', 
-        annualLeaveUsed: '0',
-        assignedStation: '', 
-        allowRemote: false 
+        name: '新員工', joinDate: '', jobTitle: '職稱', yearsOfService: '0', jobGrade: '1', jobGradeBonus: '0', 
+        kpi: '', salary: '0', permission: true, color: '#ffffff', canEditSchedule: false, 
+        annualLeave: '0', annualLeaveUsed: '0', assignedStation: '', allowRemote: false 
     };
     setEmployees([...employees, newEmp]);
   };
@@ -138,7 +121,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
   const handleChangePassword = async () => { if (!newPassword.trim()) { onAlert("請輸入新密碼"); return; } setIsSaving(true); try { const result = await updateAdminPassword(apiUrl, newPassword); onAlert(result.message); if (result.success) setNewPassword(''); } catch (error) { onAlert("失敗"); } finally { setIsSaving(false); } };
   const handleSaveUrl = () => { if (!configUrl.trim()) { onAlert("請輸入 URL"); return; } localStorage.setItem('gas_api_url', configUrl); onAlert("已更新！"); };
   const openReviewModal = (record: AssessmentRecord) => { setSelectedRecord(record); setAdminReview({ comment: record.adminComment || '', score: record.adminScore ? String(record.adminScore) : '' }); };
-  const openDeficiencyModal = (empName: string) => { const userRecords = allDeficiencies.filter(r => r.name === empName); setSelectedDeficiencyUser({ name: empName, records: userRecords }); };
+  
+  const openDeficiencyModal = (empName: string) => { 
+    // ✅ 修改：開啟彈窗時自動按日期排序，最新在前
+    const userRecords = [...allDeficiencies]
+      .filter(r => r.name === empName)
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    setSelectedDeficiencyUser({ name: empName, records: userRecords }); 
+  };
+
   const submitReview = async () => { if (!selectedRecord || selectedRecord.rowIndex === undefined) return; const score = parseInt(adminReview.score); if (isNaN(score) || score < 0 || score > 100) { onAlert("請輸入 0-100"); return; } setIsSaving(true); try { const result = await submitAdminReview(apiUrl, selectedRecord.rowIndex, adminReview.comment, score); if (result.success) { onAlert("已送出！"); setSelectedRecord(null); loadData(); } else { onAlert(result.message); } } catch (error) { onAlert("提交失敗"); } finally { setIsSaving(false); } };
   const calculateProjectedScore = () => { if (!selectedRecord) return 0; const ai = selectedRecord.aiScore || 0; const admin = parseInt(adminReview.score) || 0; return Math.round(ai * 0.6 + admin * 0.4); };
   const getDeficiencyCount = (name: string) => { return allDeficiencies.filter(d => d.name === name).length; };
@@ -149,6 +140,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
       const u = parseFloat(used || '0');
       return (t - u).toFixed(1).replace(/\.0$/, '');
   };
+
+  // ✅ 稽核排序邏輯：有最新稽核內容的優先排序
+  const sortedEmployeesForDeficiency = [...employees].sort((a, b) => {
+    const getLatestDate = (name: string) => {
+      const recs = allDeficiencies.filter(d => d.name === name);
+      if (recs.length === 0) return 0;
+      return Math.max(...recs.map(r => new Date(r.date).getTime()));
+    };
+    return getLatestDate(b.name) - getLatestDate(a.name);
+  });
+
+  // ✅ 統計今日筆數
+  const todayDateStr = new Date().toLocaleDateString('zh-TW', {year:'numeric',month:'2-digit',day:'2-digit'}).replace(/\//g, '/');
+  const todayDeficiencyCount = allDeficiencies.filter(d => d.date === todayDateStr).length;
 
   return (
     <div className="w-full max-w-7xl animate-in fade-in duration-500 relative">
@@ -224,16 +229,25 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
       ) : activeTab === 'deficiencies' ? (
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-              <AlertTriangle size={20} className="text-red-500" /> 員工稽核狀況總覽
-            </h2>
-            <span className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
-              共 {allDeficiencies.length} 筆稽核紀錄
-            </span>
+            <div className="flex flex-col">
+              <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                <AlertTriangle size={20} className="text-red-500" /> 員工稽核狀況總覽
+              </h2>
+              {/* ✅ 新增今日筆數統計 */}
+              <div className="flex gap-2 mt-2">
+                <span className="text-[10px] font-bold px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full border border-orange-200">
+                  今日新增: {todayDeficiencyCount} 筆
+                </span>
+                <span className="text-[10px] font-bold px-2 py-0.5 bg-gray-100 text-gray-500 rounded-full border border-gray-200">
+                  共 {allDeficiencies.length} 筆
+                </span>
+              </div>
+            </div>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {employees.map((emp, idx) => {
+            {/* ✅ 優化：使用已排序的員工列表 */}
+            {sortedEmployeesForDeficiency.map((emp, idx) => {
               const count = getDeficiencyCount(emp.name);
               return (
                 <button 
@@ -336,21 +350,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
         </div>
       )}
 
-      {/* 2. ✅ 補上：稽核紀錄詳細 Modal */}
+      {/* 2. 稽核紀錄詳細 Modal (已優化排序與寬度) */}
       {selectedDeficiencyUser && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
             <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
               <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
                 <AlertTriangle className="text-red-500" size={20} />
-                {selectedDeficiencyUser.name} 的稽核紀錄
+                {selectedDeficiencyUser.name} 的稽核歷史明細 (共 {selectedDeficiencyUser.records.length} 筆)
               </h3>
               <button onClick={() => setSelectedDeficiencyUser(null)} className="p-2 hover:bg-gray-200 rounded-full transition-colors">
                 <X size={20} className="text-gray-500" />
               </button>
             </div>
             
-            <div className="p-6 overflow-y-auto flex-1 bg-gray-50/50">
+            <div className="p-0 overflow-auto flex-1 bg-white">
               {selectedDeficiencyUser.records.length === 0 ? (
                 <div className="text-center py-12 text-gray-400 flex flex-col items-center">
                    <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
@@ -359,66 +373,72 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
                    <p>該員工目前無任何稽核紀錄</p>
                 </div>
               ) : (
-                <div className="space-y-4">
-                  {selectedDeficiencyUser.records.map((rec, i) => (
-                    <div key={i} className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
-                      <div className="flex justify-between items-start mb-3">
-                         <div className="flex items-center gap-2 text-gray-600 text-sm">
-                           <Calendar size={14} />
-                           <span>{formatDate(rec.date)}</span>
-                           <span className="w-1 h-1 bg-gray-300 rounded-full mx-1"></span>
-                           <MapPin size={14} />
-                           <span>{rec.station}</span>
-                         </div>
-                         <span className={`text-xs font-bold px-2 py-1 rounded-full ${rec.status === '待改善' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
-                           {rec.status}
-                         </span>
-                      </div>
-                      
-                      <div className="space-y-2 mb-4">
-                         {rec.ppe && <div className="text-sm text-gray-700"><span className="font-bold text-red-500 mr-2">PPE:</span>{rec.ppe}</div>}
-                         {rec.fencing && <div className="text-sm text-gray-700"><span className="font-bold text-red-500 mr-2">圍籬:</span>{rec.fencing}</div>}
-                         {rec.boxClean && <div className="text-sm text-gray-700"><span className="font-bold text-red-500 mr-2">箱體:</span>{rec.boxClean}</div>}
-                         {rec.siteClean && <div className="text-sm text-gray-700"><span className="font-bold text-red-500 mr-2">環境:</span>{rec.siteClean}</div>}
-                         {rec.order && <div className="text-sm text-gray-700"><span className="font-bold text-red-500 mr-2">順序:</span>{rec.order}</div>}
-                         {rec.gnop && <div className="text-sm text-gray-700"><span className="font-bold text-red-500 mr-2">GNOP:</span>{rec.gnop}</div>}
-                         {rec.other && <div className="text-sm text-gray-700"><span className="font-bold text-red-500 mr-2">其他:</span>{rec.other}</div>}
-                      </div>
-
-                      {rec.photoUrl && (
-                        <div className="mt-3 flex gap-2 overflow-x-auto pb-2">
-                           {rec.photoUrl.split(',').map((url, pIdx) => (
-                             url.trim() && (
-                               <a key={pIdx} href={url.trim()} target="_blank" rel="noopener noreferrer" className="relative group flex-shrink-0">
-                                 <div className="w-20 h-20 bg-gray-100 rounded-lg flex items-center justify-center border border-gray-200 overflow-hidden">
-                                    <ImageIcon size={20} className="text-gray-400 group-hover:scale-110 transition-transform" />
-                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
-                                 </div>
-                                 <span className="absolute bottom-1 right-1 bg-black/50 text-white text-[10px] px-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">查看</span>
-                               </a>
-                             )
-                           ))}
-                        </div>
-                      )}
-                      
-                      <div className="mt-3 pt-3 border-t border-gray-100 text-xs text-gray-400 text-right">
-                        稽核人員: {rec.auditor || '未知'}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                <table className="w-full text-left text-sm border-collapse">
+                  <thead className="bg-gray-50 text-gray-700 font-bold sticky top-0 z-10">
+                    <tr>
+                      <th className="p-4 whitespace-nowrap w-24 border-b">稽核日期</th>
+                      <th className="p-4 whitespace-nowrap w-48 border-b">交換站名稱</th>
+                      <th className="p-4 whitespace-nowrap w-24 border-b">狀態</th>
+                      <th className="p-4 whitespace-nowrap w-32 border-b">PPE/圍籬</th>
+                      <th className="p-4 whitespace-nowrap min-w-[200px] border-b">清潔細節</th>
+                      <th className="p-4 whitespace-nowrap w-24 border-b">作業/GNOP</th>
+                      <th className="p-4 min-w-[250px] border-b">其他描述</th>
+                      <th className="p-4 whitespace-nowrap w-24 border-b">稽核員</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {selectedDeficiencyUser.records.map((rec, i) => (
+                      <tr key={i} className="hover:bg-gray-50 transition-colors">
+                        <td className="p-4 whitespace-nowrap font-mono text-gray-500 align-top">{formatDate(rec.date)}</td>
+                        <td className="p-4 whitespace-nowrap font-medium text-gray-900 align-top">{rec.station}</td>
+                        <td className="p-4 whitespace-nowrap align-top">
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${rec.status === '待改善' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                            {rec.status}
+                          </span>
+                        </td>
+                        <td className="p-4 whitespace-pre-wrap align-top text-xs leading-relaxed">
+                          <div className={`${rec.ppe && rec.ppe.includes('不') ? 'text-red-600 font-bold' : ''}`}>PPE: {rec.ppe}</div>
+                          <div className={`${rec.fencing && rec.fencing.includes('不') ? 'text-red-600 font-bold' : ''}`}>圍籬: {rec.fencing}</div>
+                        </td>
+                        <td className="p-4 whitespace-pre-wrap align-top text-xs leading-relaxed">
+                          <div className={rec.boxClean && rec.boxClean.includes('不') ? 'text-red-600' : ''}>箱體: {rec.boxClean}</div>
+                          <div className={rec.siteClean && rec.siteClean.includes('不') ? 'text-red-600' : ''}>環境: {rec.siteClean}</div>
+                        </td>
+                        <td className="p-4 whitespace-pre-wrap align-top text-xs leading-relaxed">
+                          <div>順序: {rec.order}</div>
+                          <div>GNOP: {rec.gnop}</div>
+                        </td>
+                        <td className="p-4 whitespace-pre-wrap text-gray-600 align-top leading-relaxed text-xs">
+                          {rec.other}
+                          {rec.photoUrl && (
+                            <div className="mt-2 flex gap-2">
+                               {rec.photoUrl.split(',').map((url, pIdx) => (
+                                 url.trim() && (
+                                   <a key={pIdx} href={url.trim()} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[10px] text-blue-500 bg-blue-50 px-2 py-0.5 rounded border border-blue-100 hover:bg-blue-100 transition-colors">
+                                     <ImageIcon size={10} /> 圖片{pIdx + 1}
+                                   </a>
+                                 )
+                               ))}
+                            </div>
+                          )}
+                        </td>
+                        <td className="p-4 whitespace-nowrap text-gray-400 align-top text-xs">{rec.auditor || '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               )}
             </div>
-            <div className="p-4 bg-white border-t border-gray-100">
-               <button onClick={() => setSelectedDeficiencyUser(null)} className="w-full py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl transition-colors">
-                 關閉
-               </button>
+            <div className="p-4 bg-gray-50 border-t border-gray-100">
+                <button onClick={() => setSelectedDeficiencyUser(null)} className="w-full py-3 bg-white border border-gray-200 text-gray-700 font-bold rounded-xl hover:bg-gray-50 shadow-sm transition-all">
+                  關閉
+                </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* 3. ✅ 補上：考核評分 Modal */}
+      {/* 3. 考核評分 Modal */}
       {selectedRecord && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
@@ -455,11 +475,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
                     <div className="bg-white p-5 rounded-xl border border-blue-100 shadow-sm">
                         <h4 className="font-bold text-blue-800 mb-3 flex items-center gap-2"><Cloud size={18} /> AI 評估分析</h4>
                         <div className="flex items-baseline gap-2 mb-3">
-                           <span className="text-3xl font-black text-blue-600">{selectedRecord.aiScore}</span>
-                           <span className="text-sm text-gray-500">/ 100 分</span>
+                            <span className="text-3xl font-black text-blue-600">{selectedRecord.aiScore}</span>
+                            <span className="text-sm text-gray-500">/ 100 分</span>
                         </div>
                         <div className="text-sm text-gray-600 leading-relaxed bg-blue-50 p-3 rounded-lg border border-blue-100">
-                           {selectedRecord.aiComment}
+                            {selectedRecord.aiComment}
                         </div>
                     </div>
 
@@ -488,8 +508,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
                             
                             <div className="pt-4 border-t border-gray-100">
                                 <div className="flex justify-between items-center text-sm mb-4">
-                                   <span className="text-gray-500">預估最終分數 (AI 60% + 主管 40%)</span>
-                                   <span className="font-bold text-gray-900 text-lg">{calculateProjectedScore()}</span>
+                                    <span className="text-gray-500">預估最終分數 (AI 60% + 主管 40%)</span>
+                                    <span className="font-bold text-gray-900 text-lg">{calculateProjectedScore()}</span>
                                 </div>
                                 <button 
                                     onClick={submitReview}
