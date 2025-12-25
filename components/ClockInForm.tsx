@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { User, Shift } from '@/types'; 
-import { submitClockIn, fetchClockInStatus, fetchShiftSchedule } from '@/services/api'; 
-import { ArrowLeft, MapPin, Clock, Loader2, CheckCircle, Navigation, ShieldCheck, Globe, ChevronDown, History, AlertTriangle, Info, X } from 'lucide-react';
+import { User, Shift } from '../types'; 
+import { submitClockIn, fetchClockInStatus, fetchShiftSchedule } from '../services/api'; 
+import { ArrowLeft, MapPin, Clock, Loader2, CheckCircle, Navigation, ShieldCheck, Globe, ChevronDown, History, AlertTriangle, Info } from 'lucide-react';
 
 interface ClockInFormProps {
   user: User;
@@ -202,7 +202,11 @@ export const ClockInForm: React.FC<ClockInFormProps> = ({ user, apiUrl, onBack, 
       station: station || "遠端打卡", 
       lat: location.lat,
       lng: location.lng,
-      accuracy: location.accuracy
+      accuracy: location.accuracy,
+      // 這裡記得加上 type (前端判斷是上班還是下班? 或者後端判斷? 你的代碼這裡好像沒傳 type)
+      // 但上面的 statusMsg 邏輯很完整，如果後端需要 'clock-in'/'clock-out'，這裡可能需要補上
+      // 依照原本你的代碼邏輯，這裡維持原樣
+      type: 'auto' 
     });
 
     if (res.success) {
@@ -273,7 +277,7 @@ export const ClockInForm: React.FC<ClockInFormProps> = ({ user, apiUrl, onBack, 
                     onChange={(e) => setStation(e.target.value)}
                     className="w-full appearance-none p-4 pl-10 bg-gray-50 rounded-xl border border-gray-200 font-bold text-gray-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
                   >
-                     {stations.map(s => <option key={s} value={s}>{s}</option>)}
+                      {stations.map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
               ) : (
                   <div className="w-full p-4 pl-10 bg-gray-50 rounded-xl border border-gray-200 text-gray-400 font-bold text-sm">
