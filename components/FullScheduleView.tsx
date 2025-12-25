@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { FullShift, UpdateScheduleRequest, Employee } from '../types';
 import { fetchShiftSchedule, updateScheduleSource, fetchEmployeeList } from '../services/api';
-import { ArrowLeft, Calendar, Moon, Sun, Loader2, UserMinus, Cloud, Edit3, X, Save } from 'lucide-react';
+import { ArrowLeft, Calendar, Loader2, Save, X } from 'lucide-react';
 
 interface FullScheduleViewProps {
   apiUrl: string;
@@ -10,24 +10,21 @@ interface FullScheduleViewProps {
   onAlert?: (msg: string) => void;
 }
 
+// 擴充型別以包含完整 raw data
+interface ExtendedShift extends FullShift {
+    fullRecord?: string[];
+}
+
 export const FullScheduleView: React.FC<FullScheduleViewProps> = ({ apiUrl, onBack, canEdit = false, onAlert }) => {
-  const [shifts, setShifts] = useState<FullShift[]>(() => {
-      try { return JSON.parse(localStorage.getItem('cache_full_schedule') || '[]'); } catch { return []; }
-  });
-  
-  const [employees, setEmployees] = useState<Employee[]>(() => {
-      try { return JSON.parse(localStorage.getItem('admin_employees') || '[]'); } catch { return []; }
-  });
+  const [shifts, setShifts] = useState<ExtendedShift[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [colorMap, setColorMap] = useState<{ [key: string]: string }>({});
 
-  const [colorMap, setColorMap] = useState<{ [key: string]: string }>(() => {
-      try { return JSON.parse(localStorage.getItem('cache_color_map') || '{}'); } catch { return {}; }
-  });
-
-  const [isLoading, setIsLoading] = useState(shifts.length === 0);
-  const [isSyncing, setIsSyncing] = useState(shifts.length > 0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSyncing, setIsSyncing] = useState(false);
   
   // 編輯相關
-  const [editingShift, setEditingShift] = useState<FullShift | null>(null);
+  const [editingShift, setEditingShift] = useState<ExtendedShift | null>(null);
   const [editForm, setEditForm] = useState<UpdateScheduleRequest>({
       date: '', n1_night: '', n2_night: '', n1_day: '', n2_day: '', leave: []
   });
@@ -39,29 +36,29 @@ export const FullScheduleView: React.FC<FullScheduleViewProps> = ({ apiUrl, onBa
 
   useEffect(() => {
     const loadData = async () => {
-      if (shifts.length === 0) setIsLoading(true);
       try {
-        const data = await fetchShiftSchedule<FullShift>(apiUrl);
-        if (data.success) {
-          setShifts(data.shifts);
-          if (data.colorMap) setColorMap(data.colorMap);
-          localStorage.setItem('cache_full_schedule', JSON.stringify(data.shifts));
-          if (data.colorMap) localStorage.setItem('cache_color_map', JSON.stringify(data.colorMap));
+        const [schedData, empData] = await Promise.all([
+            fetchShiftSchedule<ExtendedShift>(apiUrl),
+            fetchEmployeeList(apiUrl)
+        ]);
+
+        if (schedData.success) {
+          setShifts(schedData.shifts);
+          if (schedData.colorMap) setColorMap(schedData.colorMap);
         }
-        if (employees.length === 0) {
-            const empRes = await fetchEmployeeList(apiUrl);
-            if (empRes.success) {
-                setEmployees(empRes.employees);
-                localStorage.setItem('admin_employees', JSON.stringify(empRes.employees));
-            }
+        if (empData.success) {
+            setEmployees(empData.employees);
         }
-      } catch (e) { console.error("Sync failed"); } 
-      finally { setIsLoading(false); setIsSyncing(false); }
+      } catch (e) { 
+          console.error("Load failed"); 
+      } finally { 
+          setIsLoading(false); 
+      }
     };
     loadData();
   }, [apiUrl]);
 
-  const handleEditClick = (shift: FullShift) => {
+  const handleEditClick = (shift: ExtendedShift) => {
       if (!canEdit) return;
       setEditingShift(shift);
       setEditForm({
@@ -76,8 +73,7 @@ export const FullScheduleView: React.FC<FullScheduleViewProps> = ({ apiUrl, onBa
   };
 
   const handleModalSave = async () => {
-      if (!onAlert) return;
-      
+      if (!onAlert || !editingShift) return;
       setIsSaving(true);
       
       const leaveArray = leaveInput.split(/[,，\s]+/).map(s => s.trim()).filter(s => s);
@@ -88,17 +84,9 @@ export const FullScheduleView: React.FC<FullScheduleViewProps> = ({ apiUrl, onBa
           onAlert(res.message);
           
           if (res.success) {
-              const updatedShift: FullShift = {
-                  ...editingShift!,
-                  n1_night: editForm.n1_night,
-                  n2_night: editForm.n2_night,
-                  n1_day: editForm.n1_day,
-                  n2_day: editForm.n2_day,
-                  leave: leaveArray,
-                  nightShift: [editForm.n1_night, editForm.n2_night].filter(n => n),
-                  dayShift: [editForm.n1_day, editForm.n2_day].filter(n => n)
-              };
-              setShifts(prev => prev.map(s => s.date === editingShift!.date ? updatedShift : s));
+              onAlert("儲存成功！正在重新載入最新班表...");
+              const refresh = await fetchShiftSchedule<ExtendedShift>(apiUrl);
+              if (refresh.success) setShifts(refresh.shifts);
               setEditingShift(null);
           }
       } catch(e) {
@@ -108,79 +96,148 @@ export const FullScheduleView: React.FC<FullScheduleViewProps> = ({ apiUrl, onBa
       }
   };
 
-  const groupShiftsByMonth = () => { const groups: { [key: string]: FullShift[] } = {}; shifts.forEach(shift => { const month = shift.date.substring(0, 7); if (!groups[month]) groups[month] = []; groups[month].push(shift); }); return groups; };
-  const groupedShifts = groupShiftsByMonth();
-  const sortedMonths = Object.keys(groupedShifts).sort();
-  const formatDay = (day: string) => { const map: {[key:string]: string} = { 'Mon': '星期一', 'Tue': '星期二', 'Wed': '星期三', 'Thu': '星期四', 'Fri': '星期五', 'Sat': '星期六', 'Sun': '星期日' }; return map[day] || day; };
-  const getContrastColor = (hexcolor: string) => { if (!hexcolor || hexcolor === '#ffffff') return '#374151'; const r = parseInt(hexcolor.substr(1, 2), 16); const g = parseInt(hexcolor.substr(3, 2), 16); const b = parseInt(hexcolor.substr(5, 2), 16); const yiq = ((r * 299) + (g * 587) + (b * 114)) / 1000; return (yiq >= 128) ? '#000000' : '#ffffff'; };
-  const getNameBadge = (name: string) => { let bgColor = colorMap[name] || '#f3f4f6'; if (bgColor.toLowerCase() === '#ffffff') bgColor = '#f3f4f6'; const textColor = getContrastColor(bgColor); return ( <span key={name} style={{ backgroundColor: bgColor, color: textColor }} className="px-2 py-1 rounded text-sm font-bold shadow-sm border border-black/5 whitespace-nowrap">{name}</span> ); };
-  const formatDate = (dateStr: string) => { try { const d = new Date(dateStr); if (isNaN(d.getTime())) return dateStr; const y = d.getFullYear(); const m = String(d.getMonth() + 1).padStart(2, '0'); const day = String(d.getDate()).padStart(2, '0'); return `${y}/${m}/${day}`; } catch { return dateStr; } };
+  const getCellStyle = (name: string) => {
+      if (!name || name === '-') return {};
+      const bg = colorMap[name];
+      if (!bg) return {};
+      const r = parseInt(bg.substr(1, 2), 16);
+      const g = parseInt(bg.substr(3, 2), 16);
+      const b = parseInt(bg.substr(5, 2), 16);
+      const yiq = ((r * 299) + (g * 587) + (b * 114)) / 1000;
+      const color = (yiq >= 128) ? '#000000' : '#ffffff';
+      return { backgroundColor: bg, color: color, fontWeight: 'bold' };
+  };
+
   const renderEmployeeOptions = () => ( <> <option value="">(空)</option> {employees.map((emp, idx) => ( <option key={idx} value={emp.name}>{emp.name}</option> ))} </> );
+  const simpleDate = (d: string) => d.split('/').slice(1).join('/');
 
   return (
-    <div className="w-full max-w-6xl animate-in fade-in slide-in-from-bottom-4 duration-500 relative">
-      {isSyncing && (<div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-12 z-50 bg-orange-100/90 border border-orange-200 text-orange-700 px-4 py-2 rounded-full shadow-lg flex items-center gap-2 animate-pulse pointer-events-none backdrop-blur-sm"><Cloud size={16} /><span className="text-xs font-bold">正在同步最新班表...</span></div>)}
+    <div className="w-full h-screen flex flex-col bg-gray-50 animate-in fade-in duration-500">
       
-      <div className="flex justify-between items-center mb-6"><button onClick={onBack} className="flex items-center text-gray-500 hover:text-gray-800 transition-colors"><ArrowLeft className="w-4 h-4 mr-1" /> 返回</button></div>
-
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 md:p-8">
-        <div className="flex items-center gap-3 mb-8 border-b border-gray-100 pb-4">
-          <div className="bg-indigo-600 p-3 rounded-xl text-white"><Calendar className="w-6 h-6" /></div>
-          <div><h2 className="text-2xl font-bold text-gray-900">排班總表</h2><p className="text-gray-500 text-sm">{canEdit ? "點擊表格行即可編輯人員" : "僅供檢視"}</p></div>
-        </div>
-
-        {shifts.length === 0 ? (
-           <div className="text-center py-20 bg-gray-50 rounded-xl"><p className="text-gray-500">尚無排班資料</p></div>
-        ) : (
-          <div className="space-y-10">
-            {sortedMonths.map(month => (
-              <div key={month}>
-                <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2 sticky top-0 bg-white py-2 z-10">
-                  <span className="w-2 h-6 bg-indigo-500 rounded-full"></span> {month.replace('/', '年 ')} 月
-                </h3>
-                <div className="overflow-x-auto rounded-xl border border-gray-200">
-                    <table className="w-full text-left border-collapse min-w-[800px]">
-                        <thead className="bg-gray-50 text-gray-700">
-                            <tr>
-                                <th className="p-3 border-b text-center min-w-[120px]">日期</th>
-                                {/* ✅ 順序對調：小夜在左 */}
-                                <th className="p-3 border-b min-w-[200px]"><div className="flex items-center gap-2"><Sun size={16} className="text-orange-500"/> 小夜/假日 (18-21/19-21)</div></th>
-                                <th className="p-3 border-b min-w-[200px]"><div className="flex items-center gap-2"><Moon size={16} className="text-slate-600"/> 大夜班 (21-09)</div></th>
-                                <th className="p-3 border-b min-w-[150px]"><div className="flex items-center gap-2"><UserMinus size={16} className="text-red-500"/> 請假人員</div></th>
-                                {canEdit && <th className="p-3 border-b w-10"></th>}
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100">
-                            {groupedShifts[month].map((shift, idx) => {
-                                const isToday = shift.date === todayStr;
-                                const isWeekend = ['Sat', 'Sun'].includes(shift.day);
-                                let rowClass = canEdit ? 'cursor-pointer hover:bg-blue-50 transition-colors' : 'hover:bg-gray-50';
-                                if (isToday) rowClass += ' bg-yellow-100 border-l-4 border-l-yellow-500 shadow-inner'; else if (isWeekend) rowClass += ' bg-orange-50/60';
-                                
-                                return (
-                                    <tr key={idx} className={rowClass} onClick={() => handleEditClick(shift)}>
-                                        <td className={`p-3 text-center border-r border-gray-100 ${isToday ? 'font-extrabold text-yellow-900' : ''}`}><div className={`font-bold ${isToday ? 'text-xl' : 'text-gray-800 text-lg'}`}>{formatDate(shift.date)}</div><div className={`text-xs font-medium ${isToday ? 'text-yellow-700' : (isWeekend ? 'text-red-500' : 'text-gray-400')}`}>{formatDay(shift.day)}{isToday && <span className="block text-[10px] bg-yellow-500 text-white rounded px-1 mt-1">TODAY</span>}</div></td>
-                                        {/* ✅ 順序對調：先渲染 dayShift */}
-                                        <td className="p-3"><div className="flex flex-wrap gap-2">{shift.dayShift.length > 0 ? shift.dayShift.map(getNameBadge) : <span className="text-gray-300 text-sm">-</span>}</div></td>
-                                        <td className="p-3"><div className="flex flex-wrap gap-2">{shift.nightShift.length > 0 ? shift.nightShift.map(getNameBadge) : <span className="text-gray-300 text-sm">-</span>}</div></td>
-                                        <td className={`p-3 border-l border-gray-100 ${isToday ? 'bg-yellow-50/50' : 'bg-red-50/30'}`}><div className="flex flex-wrap gap-2">{shift.leave && shift.leave.length > 0 ? shift.leave.map(n => (<span key={n} className="px-2 py-1 bg-white border border-red-200 text-red-600 rounded text-xs font-bold shadow-sm whitespace-nowrap">{n}</span>)) : <span className="text-gray-300 text-sm">-</span>}</div></td>
-                                        {canEdit && <td className="p-3 text-gray-400"><Edit3 size={16} /></td>}
-                                    </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
-                </div>
+      <div className="flex-none bg-white border-b border-gray-200 px-4 py-3 flex justify-between items-center shadow-sm z-20">
+          <div className="flex items-center gap-2">
+              <button onClick={onBack} className="p-2 hover:bg-gray-100 rounded-full text-gray-600 transition-colors"><ArrowLeft size={20} /></button>
+              <div>
+                  <h1 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                      <Calendar className="text-blue-600" size={20}/> 北區維運班表
+                  </h1>
+                  <p className="text-xs text-gray-500">
+                      {canEdit ? "💡 點擊任一行編輯 (可雙指縮放)" : "僅供檢視 (可雙指縮放)"}
+                  </p>
               </div>
-            ))}
           </div>
+          {isSyncing && <div className="text-xs font-bold text-orange-600 flex items-center gap-1"><Loader2 size={12} className="animate-spin"/> 同步中</div>}
+      </div>
+
+      <div className="flex-1 overflow-auto p-2">
+        {isLoading ? (
+            <div className="flex flex-col items-center justify-center h-full text-gray-400">
+                <Loader2 size={40} className="animate-spin mb-4 text-blue-500"/>
+                <p>正在載入完整班表...</p>
+            </div>
+        ) : (
+            <div className="bg-white shadow-lg border border-gray-300 inline-block min-w-full">
+                {/* 移除 table-fixed 讓瀏覽器根據 min-w 自動撐開，避免內容被切掉 */}
+                <table className="w-full border-collapse text-center text-sm">
+                    <thead className="sticky top-0 z-10 shadow-sm">
+                        <tr className="bg-gray-100 text-gray-800 font-bold border-b border-gray-300">
+                            {/* ✅ 修改：增加 min-w 到 100px */}
+                            <th colSpan={2} className="p-2 border-r border-gray-300 bg-orange-100 min-w-[90px]">N1</th>
+                            
+                            <th className="p-2 border-r border-gray-300 bg-orange-50 min-w-[100px]">N1大夜</th>
+                            <th className="p-2 border-r border-gray-300 bg-orange-50 min-w-[100px]">N1小夜</th>
+                            <th className="p-2 border-r border-gray-300 bg-orange-50 min-w-[100px]">台北<br/>N1D</th>
+                            <th className="p-2 border-r border-gray-300 bg-orange-50 min-w-[100px]">台北<br/>N1E</th>
+                            <th className="p-2 border-r border-gray-300 bg-orange-50 min-w-[100px]">台北<br/>N1F</th>
+                            <th className="p-2 border-r border-gray-300 bg-orange-50 min-w-[100px]">台北<br/>N1G</th>
+                            <th className="p-2 border-r border-gray-300 bg-gray-100 min-w-[100px]">支援</th>
+
+                            <th colSpan={2} className="p-2 border-r border-gray-300 bg-blue-100 min-w-[90px]">N2</th>
+
+                            <th className="p-2 border-r border-gray-300 bg-blue-50 min-w-[100px]">N2大夜</th>
+                            <th className="p-2 border-r border-gray-300 bg-blue-50 min-w-[100px]">N2小夜</th>
+                            <th className="p-2 border-r border-gray-300 bg-blue-50 min-w-[100px]">新北<br/>N2F</th>
+                            <th className="p-2 border-r border-gray-300 bg-blue-50 min-w-[100px]">新北<br/>N2G</th>
+                            <th className="p-2 border-r border-gray-300 bg-blue-50 min-w-[100px]">新北<br/>N2H</th>
+                            <th className="p-2 border-r border-gray-300 bg-blue-50 min-w-[100px]">新北<br/>N2I</th>
+                            <th className="p-2 border-r border-gray-300 bg-blue-50 min-w-[100px]">新北<br/>N2C</th>
+                            <th className="p-2 border-r border-gray-300 bg-gray-100 min-w-[100px]">支援</th>
+                            <th className="p-2 border-r border-gray-300 bg-green-50 min-w-[100px]">新北<br/>保養</th>
+                            <th className="p-2 border-r border-gray-300 bg-green-50 min-w-[100px]">新北<br/>保養</th>
+                            <th className="p-2 border-r border-gray-300 bg-gray-50 min-w-[100px]">其他</th>
+                            <th className="p-2 border-r border-gray-300 bg-gray-50 min-w-[100px]">其他</th>
+
+                            <th colSpan={5} className="p-2 bg-red-100 text-red-800 min-w-[500px]">請假名單</th>
+                        </tr>
+                    </thead>
+
+                    <tbody className="bg-white divide-y divide-gray-200">
+                        {shifts.map((shift, idx) => {
+                            const isToday = shift.date === todayStr;
+                            const row = shift.fullRecord || []; 
+                            
+                            // ✅ 修改：移除了 overflow-hidden 和 text-ellipsis，保留 whitespace-nowrap 確保不換行但完整顯示
+                            const cellClass = "p-2 border-r border-gray-200 whitespace-nowrap";
+
+                            return (
+                                <tr key={idx} 
+                                    onClick={() => handleEditClick(shift)}
+                                    className={`hover:bg-blue-50 transition-colors cursor-pointer ${isToday ? 'bg-yellow-50 shadow-inner' : ''}`}
+                                >
+                                    <td className={`p-2 border-r border-gray-200 font-mono whitespace-nowrap ${isToday ? 'text-red-600 font-bold' : 'text-gray-600'}`}>
+                                        {simpleDate(row[0] || shift.date)}
+                                    </td>
+                                    <td className={`p-2 border-r border-gray-300 font-bold whitespace-nowrap ${['六','日','Sat','Sun'].includes(row[1]) ? 'text-red-500' : 'text-gray-800'}`}>
+                                        {row[1]}
+                                    </td>
+
+                                    <td style={getCellStyle(row[2])} className={cellClass}>{row[2]}</td>
+                                    <td style={getCellStyle(row[3])} className={`${cellClass} border-gray-300`}>{row[3]}</td>
+                                    
+                                    <td style={getCellStyle(row[4])} className={cellClass}>{row[4]}</td>
+                                    <td style={getCellStyle(row[5])} className={cellClass}>{row[5]}</td>
+                                    <td style={getCellStyle(row[6])} className={cellClass}>{row[6]}</td>
+                                    <td style={getCellStyle(row[7])} className={cellClass}>{row[7]}</td>
+                                    
+                                    <td style={getCellStyle(row[8])} className={`${cellClass} border-gray-300`}>{row[8]}</td>
+
+                                    <td className="p-2 border-r border-gray-200 font-mono text-gray-400 text-xs whitespace-nowrap">{simpleDate(row[9])}</td>
+                                    <td className="p-2 border-r border-gray-300 text-gray-400 text-xs whitespace-nowrap">{row[10]}</td>
+
+                                    <td style={getCellStyle(row[11])} className={cellClass}>{row[11]}</td>
+                                    <td style={getCellStyle(row[12])} className={`${cellClass} border-gray-300`}>{row[12]}</td>
+
+                                    <td style={getCellStyle(row[13])} className={cellClass}>{row[13]}</td>
+                                    <td style={getCellStyle(row[14])} className={cellClass}>{row[14]}</td>
+                                    <td style={getCellStyle(row[15])} className={cellClass}>{row[15]}</td>
+                                    <td style={getCellStyle(row[16])} className={cellClass}>{row[16]}</td>
+                                    <td style={getCellStyle(row[17])} className={cellClass}>{row[17]}</td>
+
+                                    <td style={getCellStyle(row[18])} className={`${cellClass} border-gray-300`}>{row[18]}</td>
+
+                                    <td style={getCellStyle(row[19])} className={cellClass}>{row[19]}</td>
+                                    <td style={getCellStyle(row[20])} className={`${cellClass} border-gray-300`}>{row[20]}</td>
+
+                                    <td style={getCellStyle(row[21])} className={cellClass}>{row[21]}</td>
+                                    <td style={getCellStyle(row[22])} className={`${cellClass} border-gray-300`}>{row[22]}</td>
+
+                                    <td className="p-2 border-r border-gray-200 text-red-600 font-bold whitespace-nowrap">{row[23]}</td>
+                                    <td className="p-2 border-r border-gray-200 text-red-600 font-bold whitespace-nowrap">{row[24]}</td>
+                                    <td className="p-2 border-r border-gray-200 text-red-600 font-bold whitespace-nowrap">{row[25]}</td>
+                                    <td className="p-2 border-r border-gray-200 text-red-600 font-bold whitespace-nowrap">{row[26]}</td>
+                                    <td className="p-2 text-red-600 font-bold whitespace-nowrap">{row[27]}</td>
+                                </tr>
+                            );
+                        })}
+                    </tbody>
+                </table>
+            </div>
         )}
       </div>
 
-      {/* 編輯視窗 (Modal) */}
       {editingShift && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-           <div className={`bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 overflow-y-auto max-h-[90vh] transition-all relative ${isSaving ? 'pointer-events-none' : ''}`}>
+           <div className={`bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 overflow-y-auto max-h-[90vh] relative ${isSaving ? 'pointer-events-none' : ''}`}>
               
               {isSaving && (
                   <div className="absolute inset-0 bg-white/70 backdrop-blur-sm z-50 flex flex-col items-center justify-center rounded-2xl">
@@ -189,19 +246,36 @@ export const FullScheduleView: React.FC<FullScheduleViewProps> = ({ apiUrl, onBa
                   </div>
               )}
 
-              <div className="flex justify-between items-center mb-6 border-b border-gray-100 pb-4"><h3 className="text-xl font-bold text-gray-900">編輯班表 ({formatDate(editingShift.date)})</h3><button onClick={() => setEditingShift(null)} className="p-2 hover:bg-gray-100 rounded-full" disabled={isSaving}><X size={24} /></button></div>
+              <div className="flex justify-between items-center mb-6 border-b border-gray-100 pb-4">
+                  <div>
+                      <h3 className="text-xl font-bold text-gray-900">編輯班表 ({editingShift.date})</h3>
+                      <p className="text-sm text-red-500 mt-1">注意：僅能修改大小夜與請假，其他欄位請至源頭修改。</p>
+                  </div>
+                  <button onClick={() => setEditingShift(null)} className="p-2 hover:bg-gray-100 rounded-full" disabled={isSaving}><X size={24} /></button>
+              </div>
+
               <div className="space-y-6">
-                 {/* ✅ 順序對調：編輯彈窗也將小夜放上面或左邊 */}
-                 <div className="grid grid-cols-2 gap-4">
-                    <div><label className="block text-sm font-bold text-orange-700 mb-1">小夜 - 左 (N1)</label><select value={editForm.n1_day} onChange={e => setEditForm({...editForm, n1_day: e.target.value})} className="w-full p-2 border border-gray-300 rounded bg-white">{renderEmployeeOptions()}</select></div>
-                    <div><label className="block text-sm font-bold text-orange-700 mb-1">小夜 - 右 (N2)</label><select value={editForm.n2_day} onChange={e => setEditForm({...editForm, n2_day: e.target.value})} className="w-full p-2 border border-gray-300 rounded bg-white">{renderEmployeeOptions()}</select></div>
-                 </div>
-                 <div className="grid grid-cols-2 gap-4">
-                    <div><label className="block text-sm font-bold text-slate-700 mb-1">大夜 - 左 (N1)</label><select value={editForm.n1_night} onChange={e => setEditForm({...editForm, n1_night: e.target.value})} className="w-full p-2 border border-gray-300 rounded bg-white">{renderEmployeeOptions()}</select></div>
-                    <div><label className="block text-sm font-bold text-slate-700 mb-1">大夜 - 右 (N2)</label><select value={editForm.n2_night} onChange={e => setEditForm({...editForm, n2_night: e.target.value})} className="w-full p-2 border border-gray-300 rounded bg-white">{renderEmployeeOptions()}</select></div>
+                 <div className="bg-orange-50 p-4 rounded-xl border border-orange-100">
+                    <h4 className="font-bold text-orange-800 mb-3 border-b border-orange-200 pb-2">N1 台北組</h4>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div><label className="block text-sm font-bold text-gray-700 mb-1">N1 大夜 (C)</label><select value={editForm.n1_night} onChange={e => setEditForm({...editForm, n1_night: e.target.value})} className="w-full p-2 border border-gray-300 rounded bg-white">{renderEmployeeOptions()}</select></div>
+                        <div><label className="block text-sm font-bold text-gray-700 mb-1">N1 小夜 (D)</label><select value={editForm.n1_day} onChange={e => setEditForm({...editForm, n1_day: e.target.value})} className="w-full p-2 border border-gray-300 rounded bg-white">{renderEmployeeOptions()}</select></div>
+                    </div>
                  </div>
                  
-                 <div><label className="block text-sm font-bold text-red-700 mb-1">請假人員 (逗號分隔)</label><textarea value={leaveInput} onChange={e => setLeaveInput(e.target.value)} className="w-full p-2 border border-gray-300 rounded h-20 resize-none" placeholder="例如: 王大明, 李小華" /></div>
+                 <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
+                    <h4 className="font-bold text-blue-800 mb-3 border-b border-blue-200 pb-2">N2 新北組</h4>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div><label className="block text-sm font-bold text-gray-700 mb-1">N2 大夜 (L)</label><select value={editForm.n2_night} onChange={e => setEditForm({...editForm, n2_night: e.target.value})} className="w-full p-2 border border-gray-300 rounded bg-white">{renderEmployeeOptions()}</select></div>
+                        <div><label className="block text-sm font-bold text-gray-700 mb-1">N2 小夜 (M)</label><select value={editForm.n2_day} onChange={e => setEditForm({...editForm, n2_day: e.target.value})} className="w-full p-2 border border-gray-300 rounded bg-white">{renderEmployeeOptions()}</select></div>
+                    </div>
+                 </div>
+                 
+                 <div className="bg-red-50 p-4 rounded-xl border border-red-100">
+                    <h4 className="font-bold text-red-800 mb-3 border-b border-red-200 pb-2">請假名單 (X~AB)</h4>
+                    <label className="block text-sm font-bold text-gray-700 mb-1">輸入姓名 (以逗號分隔)</label>
+                    <textarea value={leaveInput} onChange={e => setLeaveInput(e.target.value)} className="w-full p-2 border border-gray-300 rounded h-20 resize-none bg-white" placeholder="例如: 王大明, 李小華" />
+                 </div>
                  
                  <button onClick={handleModalSave} disabled={isSaving} className={`w-full py-4 text-white rounded-xl font-bold flex justify-center items-center shadow-lg transition-all ${isSaving ? 'bg-gray-400 cursor-wait' : 'bg-blue-600 hover:bg-blue-700 shadow-blue-200'}`}>
                     {isSaving ? "儲存中..." : <><Save className="mr-2"/> 確認修改並儲存</>}
