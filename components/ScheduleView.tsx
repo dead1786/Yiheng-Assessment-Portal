@@ -48,7 +48,6 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({ user, apiUrl, onBack
     return map[day] || day;
   };
 
-  // ✅ 統一日期格式: 2025/12/15
   const formatDate = (dateStr: string) => {
     try {
       const d = new Date(dateStr);
@@ -58,6 +57,52 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({ user, apiUrl, onBack
       const day = String(d.getDate()).padStart(2, '0');
       return `${y}/${m}/${day}`;
     } catch { return dateStr; }
+  };
+
+  // 🔥 核心修改：取得班別的顯示樣式 (文字 + 顏色)
+  const getShiftStyle = (shift: Shift) => {
+    const date = new Date(shift.date);
+    const day = date.getDay(); // 0 是週日, 6 是週六
+    const isWeekend = day === 0 || day === 6;
+
+    // 1. 如果是大夜班 (後端回傳 type: 'night')
+    if (shift.type === 'night' || shift.type === '大夜班') {
+      return { 
+        text: '大夜班', 
+        bg: '#d9d2e9', // 紫藕色
+        color: '#3c364e', // 深紫色文字
+        border: '#c5bbd8'
+      };
+    }
+
+    // 2. 如果是日班 (後端回傳 type: 'day')
+    if (shift.type === 'day' || shift.type === '一般') {
+      if (isWeekend) {
+        // 假日 -> 假日班
+        return { 
+          text: '假日班', 
+          bg: '#fce5cd', // 淺橘色
+          color: '#7e5a3d', // 深橘咖啡色文字
+          border: '#e8d2ba'
+        };
+      } else {
+        // 平日 -> 小夜班
+        return { 
+          text: '小夜班', 
+          bg: '#d9ead3', // 淺綠色
+          color: '#3d5c3a', // 深綠色文字
+          border: '#c2dcc1'
+        };
+      }
+    }
+
+    // 3. 其他狀況 (預設)
+    return { 
+      text: shift.type || '一般', 
+      bg: '#f3f4f6', 
+      color: '#374151',
+      border: '#e5e7eb'
+    };
   };
 
   return (
@@ -104,8 +149,9 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({ user, apiUrl, onBack
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {shifts.map((shift, idx) => {
-                  const isWeekend = ['Sat', 'Sun'].includes(shift.day);
-                  const isToday = shift.date === todayStr; 
+                  const isWeekend = ['Sat', 'Sun', '六', '日'].includes(shift.day);
+                  const isToday = shift.date === todayStr;
+                  const style = getShiftStyle(shift); // 取得樣式
                   
                   return (
                     <tr key={idx} className={`transition-colors ${isToday ? 'bg-yellow-50' : 'hover:bg-gray-50'}`}>
@@ -117,12 +163,15 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({ user, apiUrl, onBack
                         {formatDay(shift.day)}
                       </td>
                       <td className="p-4">
-                        <span className={`px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap inline-block ${
-                          shift.type === '大夜班' 
-                            ? 'bg-slate-100 text-slate-700 border border-slate-200' 
-                            : 'bg-orange-50 text-orange-700 border border-orange-100'
-                        }`}>
-                          {shift.type}
+                        <span 
+                          className="px-3 py-1.5 rounded-lg text-sm font-bold whitespace-nowrap inline-block shadow-sm"
+                          style={{ 
+                            backgroundColor: style.bg, 
+                            color: style.color,
+                            border: `1px solid ${style.border}`
+                          }}
+                        >
+                          {style.text}
                         </span>
                       </td>
                     </tr>
