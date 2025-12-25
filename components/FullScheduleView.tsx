@@ -184,7 +184,7 @@ export const FullScheduleView: React.FC<FullScheduleViewProps> = ({ apiUrl, onBa
                       <Calendar className="text-blue-600" size={20}/> 北區維運班表
                   </h1>
                   <p className="text-xs text-gray-500">
-                      {canEdit ? "💡 點擊任一行進行「全欄位編輯」 (左側已固定)" : "僅供檢視 (左側已固定)"}
+                      {canEdit ? "💡 點擊任一行進行「全欄位編輯」" : "僅供檢視"}
                   </p>
               </div>
           </div>
