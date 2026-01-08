@@ -152,6 +152,8 @@ export interface ClockInData {
   station: string;
   lat: number;
   lng: number;
+  accuracy: number; // 新增
+  type: string;     // 新增
 }
 
 export interface ClockInResponse {
