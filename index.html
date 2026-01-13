@@ -6,17 +6,23 @@
     
     <title>益恆科技 智慧維運管理平台</title>
     
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="益恆維運">
+    
     <link rel="apple-touch-icon" sizes="180x180" href="/YihengLOGO.png">
     <link rel="icon" type="image/png" href="/YihengLOGO.png">
+    
+    <link rel="manifest" href="/manifest.json" />
     
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
       @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap');
       
       html, body {
-        overscroll-behavior-y: none; /* 維持禁止下拉重整 */
-        /* overflow-x: hidden; ❌ 移除這行，它是罪魁禍首 */
-        overflow-x: auto;      /* ✅ 改成這樣，允許水平滑動 */
+        overscroll-behavior-y: none; 
+        
+        overflow-x: auto;   
         font-family: 'Noto Sans TC', sans-serif;
         margin: 0;
         padding: 0;
