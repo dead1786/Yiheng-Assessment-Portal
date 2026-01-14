@@ -164,7 +164,6 @@ export const DeficiencyReportForm: React.FC<DeficiencyReportFormProps> = ({ user
         const uploadedUrls: string[] = [];
 
         if (readyPhotos.length > 0) {
-            // ✅ 修改重點：重新命名邏輯
             const uploadPromises = readyPhotos.map(async (photo) => {
                 setPhotos(prev => prev.map(p => p.id === photo.id ? { ...p, status: 'uploading' } : p));
                 
@@ -174,6 +173,7 @@ export const DeficiencyReportForm: React.FC<DeficiencyReportFormProps> = ({ user
                     const fileNum = globalIdx + 1;
                     
                     // 2. 處理檔名：淨化站名 + 判斷單多張
+                    // [Fix] 確保檔名是交換站名稱
                     const safeStationName = formData.station.trim().replace(/[\\/:*?"<>|]/g, "_") || "UnknownStation";
                     const newFileName = photos.length > 1 
                         ? `${safeStationName}-${fileNum}.jpg` 
@@ -184,7 +184,8 @@ export const DeficiencyReportForm: React.FC<DeficiencyReportFormProps> = ({ user
                         data: {
                             fileName: newFileName,
                             mimeType: 'image/jpeg',
-                            base64: photo.compressedBase64
+                            base64: photo.compressedBase64,
+                            stationName: safeStationName // ✅ 新增：傳送站名給後端建立資料夾
                         }
                     };
 
