@@ -65,7 +65,6 @@ export const DeficiencyReportForm: React.FC<DeficiencyReportFormProps> = ({ user
   // 核心邏輯：選擇檔案後，僅進行「前端壓縮」，不上傳
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       if (e.target.files && e.target.files.length > 0) {
-          // ✅ 修正 1: 強制轉型為 File[]
           const newFiles = Array.from(e.target.files) as File[];
           
           // 過濾大檔
@@ -165,14 +164,25 @@ export const DeficiencyReportForm: React.FC<DeficiencyReportFormProps> = ({ user
         const uploadedUrls: string[] = [];
 
         if (readyPhotos.length > 0) {
-            const uploadPromises = readyPhotos.map(async (photo, idx) => {
+            // ✅ 修改重點：重新命名邏輯
+            const uploadPromises = readyPhotos.map(async (photo) => {
                 setPhotos(prev => prev.map(p => p.id === photo.id ? { ...p, status: 'uploading' } : p));
                 
                 try {
+                    // 1. 取得該照片在所有照片中的索引 (確保順序)
+                    const globalIdx = photos.findIndex(p => p.id === photo.id);
+                    const fileNum = globalIdx + 1;
+                    
+                    // 2. 處理檔名：淨化站名 + 判斷單多張
+                    const safeStationName = formData.station.trim().replace(/[\\/:*?"<>|]/g, "_") || "UnknownStation";
+                    const newFileName = photos.length > 1 
+                        ? `${safeStationName}-${fileNum}.jpg` 
+                        : `${safeStationName}.jpg`;
+
                     const payload = {
                         action: 'uploadImage',
                         data: {
-                            fileName: photo.file.name.replace(/\.[^/.]+$/, "") + ".jpg",
+                            fileName: newFileName,
                             mimeType: 'image/jpeg',
                             base64: photo.compressedBase64
                         }
@@ -194,7 +204,7 @@ export const DeficiencyReportForm: React.FC<DeficiencyReportFormProps> = ({ user
                     }
                 } catch (err) {
                     setPhotos(prev => prev.map(p => p.id === photo.id ? { ...p, status: 'error' } : p));
-                    console.error(`Photo ${idx} failed`);
+                    console.error(`Photo upload failed`);
                     return null; 
                 }
             });
@@ -238,7 +248,6 @@ export const DeficiencyReportForm: React.FC<DeficiencyReportFormProps> = ({ user
           <input 
             type="text" 
             value={formData[field]} 
-            // ✅ 修正 2: 強制轉型 field 為 string
             onChange={e => handleChange(field as string, e.target.value)}
             className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none"
             placeholder={placeholder}
