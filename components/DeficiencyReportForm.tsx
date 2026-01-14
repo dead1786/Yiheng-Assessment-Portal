@@ -163,21 +163,28 @@ export const DeficiencyReportForm: React.FC<DeficiencyReportFormProps> = ({ user
         const readyPhotos = photos.filter(p => p.status === 'ready' && p.compressedBase64);
         const uploadedUrls: string[] = [];
 
+        // ✅ 新增：取得當前時間後綴 (HHMMSS)，避免檔名重複
+        const now = new Date();
+        const timeSuffix = now.getHours().toString().padStart(2, '0') + 
+                           now.getMinutes().toString().padStart(2, '0') + 
+                           now.getSeconds().toString().padStart(2, '0');
+
         if (readyPhotos.length > 0) {
             const uploadPromises = readyPhotos.map(async (photo) => {
                 setPhotos(prev => prev.map(p => p.id === photo.id ? { ...p, status: 'uploading' } : p));
                 
                 try {
-                    // 1. 取得該照片在所有照片中的索引 (確保順序)
                     const globalIdx = photos.findIndex(p => p.id === photo.id);
                     const fileNum = globalIdx + 1;
                     
-                    // 2. 處理檔名：淨化站名 + 判斷單多張
-                    // [Fix] 確保檔名是交換站名稱
+                    // 2. 處理檔名：淨化站名 + (序號) + 時間後綴
                     const safeStationName = formData.station.trim().replace(/[\\/:*?"<>|]/g, "_") || "UnknownStation";
+                    
+                    // 邏輯：站名-序號_時間.jpg
+                    // 例如：中山站-1_153022.jpg
                     const newFileName = photos.length > 1 
-                        ? `${safeStationName}-${fileNum}.jpg` 
-                        : `${safeStationName}.jpg`;
+                        ? `${safeStationName}-${fileNum}_${timeSuffix}.jpg` 
+                        : `${safeStationName}_${timeSuffix}.jpg`;
 
                     const payload = {
                         action: 'uploadImage',
@@ -185,7 +192,7 @@ export const DeficiencyReportForm: React.FC<DeficiencyReportFormProps> = ({ user
                             fileName: newFileName,
                             mimeType: 'image/jpeg',
                             base64: photo.compressedBase64,
-                            stationName: safeStationName // ✅ 新增：傳送站名給後端建立資料夾
+                            stationName: safeStationName 
                         }
                     };
 
