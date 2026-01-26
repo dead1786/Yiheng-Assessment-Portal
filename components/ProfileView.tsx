@@ -111,12 +111,14 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ user, apiUrl, onBack, 
   const iconColors = { red: 'text-red-600', green: 'text-green-600', blue: 'text-blue-600' };
   const labelColors = { red: 'text-red-700', green: 'text-green-700', blue: 'text-blue-700' };
 
+  // ✅ 修正：使用 Google 縮圖 API，解決破圖與變數拼接錯誤
   const getDirectImageUrl = (url: string) => {
     try {
       if (!url.includes('drive.google.com')) return url;
       const idMatch = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
       if (idMatch && idMatch[1]) {
-         return `https://lh3.googleusercontent.com/d/${idMatch[1]}`;
+         // sz=w1000 代表寬度設為 1000px，既清晰又比原圖載入快
+         return `https://drive.google.com/thumbnail?id=${idMatch[1]}&sz=w1000`;
       }
       return url;
     } catch { return url; }
@@ -125,7 +127,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ user, apiUrl, onBack, 
   // ✅ 新增：開啟圖片瀏覽的處理函式
   const handleViewPhotos = (photoUrlString: string | undefined) => {
       if (!photoUrlString) return;
-      // 修改：同時支援 "逗號" 或 "換行" 作為分隔符號，避免手動編輯導致分割失敗
+      // ✅ 修正：使用正規表達式，同時支援「逗號」與「換行」作為分隔符號
       const urls = photoUrlString.split(/[,|\n]+/).map(s => s.trim()).filter(s => s);
       if (urls.length > 0) {
           setViewingPhotos(urls);

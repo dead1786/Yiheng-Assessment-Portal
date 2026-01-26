@@ -158,13 +158,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
   // ✅ 新增狀態：控制照片彈窗
   const [viewingPhotos, setViewingPhotos] = useState<string[] | null>(null);
 
-  // ✅ 新增 helper：將 Drive 連結轉為直連圖片
+  // ✅ 修正：使用 Google 縮圖 API，解決破圖與變數拼接錯誤
   const getDirectImageUrl = (url: string) => {
     try {
       if (!url.includes('drive.google.com')) return url;
       const idMatch = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
       if (idMatch && idMatch[1]) {
-         return `https://lh3.googleusercontent.com/d/$${idMatch[1]}`;
+         // sz=w1000 代表寬度設為 1000px，既清晰又比原圖載入快
+         return `https://drive.google.com/thumbnail?id=${idMatch[1]}&sz=w1000`;
       }
       return url;
     } catch { return url; }
@@ -172,7 +173,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
 
 const handleViewPhotos = (photoUrlString: string | undefined) => {
       if (!photoUrlString) return;
-      // 修改：同時支援 "逗號" 或 "換行" 作為分隔符號
+      // ✅ 修正：使用正規表達式，同時支援「逗號」與「換行」作為分隔符號
       const urls = photoUrlString.split(/[,|\n]+/).map(s => s.trim()).filter(s => s);
       if (urls.length > 0) {
           setViewingPhotos(urls);
