@@ -11,6 +11,59 @@ interface ProfileViewProps {
   onRefresh?: () => Promise<void>; 
 }
 
+// ✅ [插入] 獨立的圖片預覽元件 (處理載入狀態)
+const ImagePreview: React.FC<{ url: string, index: number }> = ({ url, index }) => {
+  const [status, setStatus] = useState<'loading' | 'loaded' | 'error'>('loading');
+
+  // 內建轉換邏輯，確保元件獨立運作
+  const getSafeUrl = (u: string) => {
+    try {
+       if (!u.includes('drive.google.com')) return u;
+       const idMatch = u.match(/\/d\/([a-zA-Z0-9_-]+)/);
+       // 使用 Google 縮圖 API (sz=w1200 代表高畫質)
+       if (idMatch && idMatch[1]) return `https://drive.google.com/thumbnail?id=${idMatch[1]}&sz=w1200`;
+       return u;
+    } catch { return u; }
+  };
+
+  const src = getSafeUrl(url);
+
+  return (
+    <div className="bg-white p-2 rounded-lg shadow-2xl w-full min-h-[300px] flex flex-col relative">
+      {/* 圖片區域 */}
+      <div className="relative w-full flex-1 min-h-[250px] bg-gray-50 rounded flex items-center justify-center overflow-hidden">
+        {status === 'loading' && (
+           <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-400 gap-2 z-10">
+              <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+              <span className="text-xs font-mono">載入中...</span>
+           </div>
+        )}
+        
+        {status === 'error' ? (
+           <div className="flex flex-col items-center justify-center gap-2 text-red-400 p-4">
+              <AlertTriangle size={32} />
+              <p className="text-sm font-bold">圖片無法顯示</p>
+              <a href={src} target="_blank" rel="noreferrer" className="text-xs text-blue-500 underline">點此開啟原圖</a>
+           </div>
+        ) : (
+           <img 
+              src={src} 
+              alt={`Evidence ${index + 1}`} 
+              className={`w-full h-auto max-h-[80vh] object-contain rounded transition-opacity duration-500 ${status === 'loaded' ? 'opacity-100' : 'opacity-0'}`}
+              onLoad={() => setStatus('loaded')}
+              onError={() => setStatus('error')}
+           />
+        )}
+      </div>
+      {/* 底部文字 */}
+      <div className="text-center py-3 text-sm text-gray-500 font-mono border-t border-gray-100 mt-1">
+          照片 {index + 1}
+      </div>
+    </div>
+  );
+};
+
+
 export const ProfileView: React.FC<ProfileViewProps> = ({ user, apiUrl, onBack, onRefresh }) => {
   const [kpiValue, setKpiValue] = useState<string | number | undefined>(() => {
     const u = user as any;
@@ -274,9 +327,9 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ user, apiUrl, onBack, 
           </div>
         )}
       </div>
-      {/* ✅ 新增：照片瀏覽 Modal */}
+     {/* ✅ 新增：照片瀏覽 Modal (已優化載入狀態) */}
       {viewingPhotos && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setViewingPhotos(null)}>
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-in fade-in duration-200" onClick={() => setViewingPhotos(null)}>
             <button 
                 onClick={() => setViewingPhotos(null)}
                 className="absolute top-4 right-4 p-3 bg-white/10 text-white rounded-full hover:bg-white/20 transition-colors z-[70]"
@@ -286,17 +339,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ user, apiUrl, onBack, 
             
             <div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto p-4 flex flex-col items-center gap-6" onClick={e => e.stopPropagation()}>
                 {viewingPhotos.map((url, idx) => (
-                    <div key={idx} className="bg-white p-2 rounded-lg shadow-2xl w-full">
-                        <img 
-                            src={getDirectImageUrl(url)} 
-                            alt={`Evidence ${idx + 1}`} 
-                            className="w-full h-auto rounded"
-                            loading="lazy"
-                        />
-                        <div className="text-center py-2 text-sm text-gray-500 font-mono">
-                            照片 {idx + 1}
-                        </div>
-                    </div>
+                    <ImagePreview key={idx} url={url} index={idx} />
                 ))}
             </div>
         </div>
