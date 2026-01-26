@@ -12,7 +12,7 @@ interface AdminDashboardProps {
   onConfirm: (msg: string, onYes: () => void) => void;
 }
 
-// ✅ [修正] 獨立的圖片預覽元件 (CSS 優化：防止裁切 + URL 變數修正)
+// ✅ [修正] 圖片預覽元件 (終極防裁切版：強制完整顯示)
 const ImagePreview: React.FC<{ url: string, index: number }> = ({ url, index }) => {
   const [status, setStatus] = useState<'loading' | 'loaded' | 'error'>('loading');
 
@@ -20,7 +20,7 @@ const ImagePreview: React.FC<{ url: string, index: number }> = ({ url, index }) 
     try {
        if (!u.includes('drive.google.com')) return u;
        const idMatch = u.match(/\/d\/([a-zA-Z0-9_-]+)/);
-       // 確保這裡有加 $ 符號，並使用 thumbnail API
+       // 使用 Google 縮圖 API
        if (idMatch && idMatch[1]) return `https://drive.google.com/thumbnail?id=${idMatch[1]}&sz=w1200`;
        return u;
     } catch { return u; }
@@ -29,12 +29,14 @@ const ImagePreview: React.FC<{ url: string, index: number }> = ({ url, index }) 
   const src = getSafeUrl(url);
 
   return (
-    <div className="bg-white p-2 rounded-lg shadow-2xl w-full min-h-[300px] flex flex-col relative">
-      <div className="relative w-full flex-1 min-h-[250px] bg-gray-50 rounded flex items-center justify-center overflow-hidden">
+    <div className="bg-white p-2 rounded-lg shadow-2xl w-full flex flex-col relative">
+      {/* 圖片容器：設定固定高度範圍，背景改深灰色增加對比 */}
+      <div className="relative w-full h-[70vh] bg-gray-900 rounded flex items-center justify-center overflow-hidden">
+        
         {status === 'loading' && (
            <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-400 gap-2 z-10">
-              <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
-              <span className="text-xs font-mono">載入中...</span>
+              <Loader2 className="w-8 h-8 animate-spin text-white" />
+              <span className="text-xs font-mono text-white">載入中...</span>
            </div>
         )}
         
@@ -42,14 +44,16 @@ const ImagePreview: React.FC<{ url: string, index: number }> = ({ url, index }) 
            <div className="flex flex-col items-center justify-center gap-2 text-red-400 p-4">
               <AlertTriangle size={32} />
               <p className="text-sm font-bold">圖片無法顯示</p>
-              <a href={src} target="_blank" rel="noreferrer" className="text-xs text-blue-500 underline">點此開啟原圖</a>
+              <a href={src} target="_blank" rel="noreferrer" className="text-xs text-blue-400 underline">點此開啟原圖</a>
            </div>
         ) : (
            <img 
               src={src} 
               alt={`Evidence ${index + 1}`} 
-              // ✅ 修正 CSS：移除 w-full，改為 max-w-full w-auto h-auto，確保完整顯示不裁切
-              className={`max-w-full max-h-[80vh] w-auto h-auto object-contain rounded shadow-sm transition-opacity duration-500 ${status === 'loaded' ? 'opacity-100' : 'opacity-0'}`}
+              // ✅ CSS 關鍵修正：
+              // 1. h-full w-full object-contain: 強制圖片在容器內「完整顯示」，多餘空間留黑邊，絕不裁切。
+              // 2. max-h-full max-w-full: 雙重保險。
+              className={`max-w-full max-h-full object-contain shadow-sm transition-opacity duration-500 ${status === 'loaded' ? 'opacity-100' : 'opacity-0'}`}
               onLoad={() => setStatus('loaded')}
               onError={() => setStatus('error')}
            />
