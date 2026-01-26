@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { User, DeficiencyRecord } from '../types';
 import { fetchDeficiencyRecords } from '../services/api';
-import { ArrowLeft, User as UserIcon, AlertTriangle, Loader2, Award, Cloud, RefreshCw, Palmtree } from 'lucide-react';
+import { ArrowLeft, User as UserIcon, AlertTriangle, Loader2, Award, Cloud, RefreshCw, Palmtree, Image as ImageIcon, X } from 'lucide-react';
 
 interface ProfileViewProps {
   user: User;
@@ -24,6 +24,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ user, apiUrl, onBack, 
   const [isLoading, setIsLoading] = useState(deficiencies.length === 0);
   const [isSyncing, setIsSyncing] = useState(deficiencies.length > 0);
   const [kpiLoading, setKpiLoading] = useState(false); 
+  const [viewingPhotos, setViewingPhotos] = useState<string[] | null>(null);
 
   // 獨立的資料載入函式
   const loadData = async (forceRefresh = false) => {
@@ -109,6 +110,25 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ user, apiUrl, onBack, 
   const textColors = { red: 'text-red-900', green: 'text-green-900', blue: 'text-blue-900' };
   const iconColors = { red: 'text-red-600', green: 'text-green-600', blue: 'text-blue-600' };
   const labelColors = { red: 'text-red-700', green: 'text-green-700', blue: 'text-blue-700' };
+
+  const getDirectImageUrl = (url: string) => {
+    try {
+      if (!url.includes('drive.google.com')) return url;
+      const idMatch = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+      if (idMatch && idMatch[1]) {
+         return `https://lh3.googleusercontent.com/d/${idMatch[1]}`;
+      }
+      return url;
+    } catch { return url; }
+  };
+
+  const handleViewPhotos = (photoUrlString: string | undefined) => {
+      if (!photoUrlString) return;
+      const urls = photoUrlString.split(',').map(s => s.trim()).filter(s => s);
+      if (urls.length > 0) {
+          setViewingPhotos(urls);
+      }
+  };
 
   return (
     <div className="w-full max-w-5xl animate-in fade-in slide-in-from-bottom-4 duration-500 relative">
@@ -208,6 +228,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ user, apiUrl, onBack, 
                   <th className="p-4 whitespace-nowrap w-24 border-b">作業順序</th>
                   <th className="p-4 whitespace-nowrap w-24 border-b">GNOP</th>
                   <th className="p-4 min-w-[250px] border-b">其他問題</th>
+                  <th className="p-4 whitespace-nowrap w-20 border-b text-center">照片</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -229,6 +250,19 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ user, apiUrl, onBack, 
                     <td className="p-4 whitespace-nowrap align-top">{record.order}</td>
                     <td className="p-4 whitespace-nowrap align-top">{record.gnop}</td>
                     <td className="p-4 whitespace-pre-wrap text-gray-600 leading-relaxed align-top">{record.other}</td>
+                  <td className="p-4 align-top text-center">
+                        {record.photoUrl ? (
+                            <button 
+                                onClick={() => handleViewPhotos(record.photoUrl)}
+                                className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 hover:text-blue-700 transition-colors"
+                                title="查看照片"
+                            >
+                                <ImageIcon size={20} />
+                            </button>
+                        ) : (
+                            <span className="text-gray-300">-</span>
+                        )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -236,6 +270,33 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ user, apiUrl, onBack, 
           </div>
         )}
       </div>
+      {/* ✅ 新增：照片瀏覽 Modal */}
+      {viewingPhotos && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setViewingPhotos(null)}>
+            <button 
+                onClick={() => setViewingPhotos(null)}
+                className="absolute top-4 right-4 p-3 bg-white/10 text-white rounded-full hover:bg-white/20 transition-colors z-[70]"
+            >
+                <X size={32} />
+            </button>
+            
+            <div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto p-4 flex flex-col items-center gap-6" onClick={e => e.stopPropagation()}>
+                {viewingPhotos.map((url, idx) => (
+                    <div key={idx} className="bg-white p-2 rounded-lg shadow-2xl w-full">
+                        <img 
+                            src={getDirectImageUrl(url)} 
+                            alt={`Evidence ${idx + 1}`} 
+                            className="w-full h-auto rounded"
+                            loading="lazy"
+                        />
+                        <div className="text-center py-2 text-sm text-gray-500 font-mono">
+                            照片 {idx + 1}
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
+      )}
     </div>
   );
 };

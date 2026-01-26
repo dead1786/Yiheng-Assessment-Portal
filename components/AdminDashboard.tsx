@@ -155,6 +155,29 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
   const todayDateStr = new Date().toLocaleDateString('zh-TW', {year:'numeric',month:'2-digit',day:'2-digit'}).replace(/\//g, '/');
   const todayDeficiencyCount = allDeficiencies.filter(d => d.date === todayDateStr).length;
 
+  // ✅ 新增狀態：控制照片彈窗
+  const [viewingPhotos, setViewingPhotos] = useState<string[] | null>(null);
+
+  // ✅ 新增 helper：將 Drive 連結轉為直連圖片
+  const getDirectImageUrl = (url: string) => {
+    try {
+      if (!url.includes('drive.google.com')) return url;
+      const idMatch = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+      if (idMatch && idMatch[1]) {
+         return `https://lh3.googleusercontent.com/d/$${idMatch[1]}`;
+      }
+      return url;
+    } catch { return url; }
+  };
+
+  const handleViewPhotos = (photoUrlString: string | undefined) => {
+      if (!photoUrlString) return;
+      const urls = photoUrlString.split(',').map(s => s.trim()).filter(s => s);
+      if (urls.length > 0) {
+          setViewingPhotos(urls);
+      }
+  };
+
   return (
     <div className="w-full max-w-7xl animate-in fade-in duration-500 relative">
       {isSyncing && (
@@ -383,6 +406,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
                       <th className="p-4 whitespace-nowrap min-w-[200px] border-b">清潔細節</th>
                       <th className="p-4 whitespace-nowrap w-24 border-b">作業/GNOP</th>
                       <th className="p-4 min-w-[250px] border-b">其他描述</th>
+                      <th className="p-4 whitespace-nowrap w-20 border-b text-center">照片</th>
                       <th className="p-4 whitespace-nowrap w-24 border-b">稽核員</th>
                     </tr>
                   </thead>
@@ -410,17 +434,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
                         </td>
                         <td className="p-4 whitespace-pre-wrap text-gray-600 align-top leading-relaxed text-xs">
                           {rec.other}
-                          {rec.photoUrl && (
-                            <div className="mt-2 flex gap-2">
-                               {rec.photoUrl.split(',').map((url, pIdx) => (
-                                 url.trim() && (
-                                   <a key={pIdx} href={url.trim()} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[10px] text-blue-500 bg-blue-50 px-2 py-0.5 rounded border border-blue-100 hover:bg-blue-100 transition-colors">
-                                     <ImageIcon size={10} /> 圖片{pIdx + 1}
-                                   </a>
-                                 )
-                               ))}
-                            </div>
-                          )}
+                        </td>
+                        <td className="p-4 align-top text-center">
+                            {rec.photoUrl ? (
+                                <button 
+                                    onClick={() => handleViewPhotos(rec.photoUrl)}
+                                    className="p-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 hover:text-blue-700 transition-colors"
+                                    title="查看照片"
+                                >
+                                    <ImageIcon size={16} />
+                                </button>
+                            ) : (
+                                <span className="text-gray-300">-</span>
+                            )}
                         </td>
                         <td className="p-4 whitespace-nowrap text-gray-400 align-top text-xs">{rec.auditor || '-'}</td>
                       </tr>
@@ -524,6 +550,32 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
                 </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ✅ 新增：照片瀏覽 Modal */}
+      {viewingPhotos && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setViewingPhotos(null)}>
+            <button 
+                onClick={() => setViewingPhotos(null)}
+                className="absolute top-4 right-4 p-3 bg-white/10 text-white rounded-full hover:bg-white/20 transition-colors z-[110]"
+            >
+                <X size={32} />
+            </button>
+            
+            <div className="w-full max-w-5xl max-h-[90vh] overflow-y-auto p-4 flex flex-col items-center gap-4" onClick={e => e.stopPropagation()}>
+                {viewingPhotos.map((url, idx) => (
+                    <div key={idx} className="bg-white p-2 rounded-lg shadow-2xl w-full">
+                        <img 
+                            src={getDirectImageUrl(url)} 
+                            alt={`Evidence ${idx + 1}`} 
+                            className="w-full h-auto rounded"
+                            loading="lazy"
+                        />
+                        <div className="text-center py-2 text-sm text-gray-500 font-mono">照片 {idx + 1}</div>
+                    </div>
+                ))}
+            </div>
         </div>
       )}
 

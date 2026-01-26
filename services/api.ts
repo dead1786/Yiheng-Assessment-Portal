@@ -4,7 +4,6 @@ import {
   UpdateScheduleRequest, User, ClockInData, ClockInResponse 
 } from '../types';
 
-// 通用 API 請求函數
 async function apiRequest<T>(apiUrl: string, payload: any): Promise<T> {
     if (!apiUrl) throw new Error("API URL 未設定");
     const controller = new AbortController();
@@ -63,7 +62,6 @@ export const fetchDeficiencyRecords = async (apiUrl: string, name?: string): Pro
 export const fetchShiftSchedule = async <T = any>(apiUrl: string, name?: string): Promise<ShiftScheduleResponse<T>> => { try { return await apiRequest(apiUrl, { action: 'getShiftSchedule', name: name || "" }); } catch (error) { return { success: false, shifts: [], message: "無法載入班表" }; } };
 export const kickUser = async (apiUrl: string, name: string): Promise<{ success: boolean; message: string }> => { try { return await apiRequest(apiUrl, { action: 'kickUser', name }); } catch (error) { return { success: false, message: "指令失敗" }; } };
 
-// ✅ 修正：擴充了 userDetails 的回傳定義，包含特休、站點、權限等
 export const checkLoginStatus = async (apiUrl: string, name: string, sessionTime: number): Promise<{ 
     success: boolean; 
     kicked: boolean; 
@@ -75,7 +73,7 @@ export const checkLoginStatus = async (apiUrl: string, name: string, sessionTime
         annualLeaveUsed?: string; 
         assignedStation?: string; 
         allowRemote?: boolean;
-        permissionGranted?: boolean; // 對應後端欄位
+        permissionGranted?: boolean; 
     } 
 }> => { 
     try { return await apiRequest(apiUrl, { action: 'checkLoginStatus', name, sessionTime }); } catch (error) { return { success: false, kicked: false }; } 
@@ -158,14 +156,21 @@ const mapUsersFromRows = (rows: any[]): User[] => {
          allowRemote: row.allowRemote === true || String(row.allowRemote).toLowerCase() === 'true'
        } as User;
     }
-    // 陣列處理邏輯省略，為求簡潔
     return {
       name: row[0], jobTitle: row[1] || '', jobGrade: row[2] || '', yearsOfService: row[3] || '0', joinDate: row[4] || '', kpi: kpiFound, isAdmin: false, canAssess: false, canEditSchedule: false, annualLeave: "0", annualLeaveUsed: "0", assignedStation: "", allowRemote: false
     } as User;
   }).filter(Boolean) as User[];
 };
 
-export const fetchStationList = async (apiUrl: string): Promise<{ success: boolean; stations: string[] }> => { try { return await apiRequest(apiUrl, { action: 'getStationList' }); } catch (error) { return { success: false, stations: [] }; } };
+export const fetchStationList = async (apiUrl: string): Promise<{ success: boolean; stations: string[] }> => { 
+  try { 
+    // ✅ 簡化：現在後端已修正為回傳純字串陣列，直接接收即可
+    const res = await apiRequest<{ success: boolean, stations: string[] }>(apiUrl, { action: 'getStationList' });
+    return { success: res.success, stations: res.stations || [] }; 
+  } catch (error) { 
+    return { success: false, stations: [] }; 
+  } 
+};
 
 export const fetchOfficeList = async (apiUrl: string): Promise<{ success: boolean; offices: string[] }> => { 
     try { 

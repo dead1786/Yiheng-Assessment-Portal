@@ -65,7 +65,6 @@ export const DeficiencyReportForm: React.FC<DeficiencyReportFormProps> = ({ user
   // 核心邏輯：選擇檔案後，僅進行「前端壓縮」，不上傳
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       if (e.target.files && e.target.files.length > 0) {
-          // ✅ 修正 1: 強制轉型為 File[]
           const newFiles = Array.from(e.target.files) as File[];
           
           // 過濾大檔
@@ -164,17 +163,36 @@ export const DeficiencyReportForm: React.FC<DeficiencyReportFormProps> = ({ user
         const readyPhotos = photos.filter(p => p.status === 'ready' && p.compressedBase64);
         const uploadedUrls: string[] = [];
 
+        // ✅ 新增：取得當前時間後綴 (HHMMSS)，避免檔名重複
+        const now = new Date();
+        const timeSuffix = now.getHours().toString().padStart(2, '0') + 
+                           now.getMinutes().toString().padStart(2, '0') + 
+                           now.getSeconds().toString().padStart(2, '0');
+
         if (readyPhotos.length > 0) {
-            const uploadPromises = readyPhotos.map(async (photo, idx) => {
+            const uploadPromises = readyPhotos.map(async (photo) => {
                 setPhotos(prev => prev.map(p => p.id === photo.id ? { ...p, status: 'uploading' } : p));
                 
                 try {
+                    const globalIdx = photos.findIndex(p => p.id === photo.id);
+                    const fileNum = globalIdx + 1;
+                    
+                    // 2. 處理檔名：淨化站名 + (序號) + 時間後綴
+                    const safeStationName = formData.station.trim().replace(/[\\/:*?"<>|]/g, "_") || "UnknownStation";
+                    
+                    // 邏輯：站名-序號_時間.jpg
+                    // 例如：中山站-1_153022.jpg
+                    const newFileName = photos.length > 1 
+                        ? `${safeStationName}-${fileNum}_${timeSuffix}.jpg` 
+                        : `${safeStationName}_${timeSuffix}.jpg`;
+
                     const payload = {
                         action: 'uploadImage',
                         data: {
-                            fileName: photo.file.name.replace(/\.[^/.]+$/, "") + ".jpg",
+                            fileName: newFileName,
                             mimeType: 'image/jpeg',
-                            base64: photo.compressedBase64
+                            base64: photo.compressedBase64,
+                            stationName: safeStationName 
                         }
                     };
 
@@ -194,7 +212,7 @@ export const DeficiencyReportForm: React.FC<DeficiencyReportFormProps> = ({ user
                     }
                 } catch (err) {
                     setPhotos(prev => prev.map(p => p.id === photo.id ? { ...p, status: 'error' } : p));
-                    console.error(`Photo ${idx} failed`);
+                    console.error(`Photo upload failed`);
                     return null; 
                 }
             });
@@ -238,7 +256,6 @@ export const DeficiencyReportForm: React.FC<DeficiencyReportFormProps> = ({ user
           <input 
             type="text" 
             value={formData[field]} 
-            // ✅ 修正 2: 強制轉型 field 為 string
             onChange={e => handleChange(field as string, e.target.value)}
             className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none"
             placeholder={placeholder}
