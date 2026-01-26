@@ -170,9 +170,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
     } catch { return url; }
   };
 
-  const handleViewPhotos = (photoUrlString: string | undefined) => {
+const handleViewPhotos = (photoUrlString: string | undefined) => {
       if (!photoUrlString) return;
-      const urls = photoUrlString.split(',').map(s => s.trim()).filter(s => s);
+      // 修改：同時支援 "逗號" 或 "換行" 作為分隔符號
+      const urls = photoUrlString.split(/[,|\n]+/).map(s => s.trim()).filter(s => s);
       if (urls.length > 0) {
           setViewingPhotos(urls);
       }

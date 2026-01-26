@@ -122,9 +122,11 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ user, apiUrl, onBack, 
     } catch { return url; }
   };
 
+  // ✅ 新增：開啟圖片瀏覽的處理函式
   const handleViewPhotos = (photoUrlString: string | undefined) => {
       if (!photoUrlString) return;
-      const urls = photoUrlString.split(',').map(s => s.trim()).filter(s => s);
+      // 修改：同時支援 "逗號" 或 "換行" 作為分隔符號，避免手動編輯導致分割失敗
+      const urls = photoUrlString.split(/[,|\n]+/).map(s => s.trim()).filter(s => s);
       if (urls.length > 0) {
           setViewingPhotos(urls);
       }
