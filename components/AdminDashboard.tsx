@@ -12,7 +12,7 @@ interface AdminDashboardProps {
   onConfirm: (msg: string, onYes: () => void) => void;
 }
 
-// ✅ [插入] 獨立的圖片預覽元件 (處理載入狀態)
+// ✅ [修正] 獨立的圖片預覽元件 (CSS 優化：防止裁切 + URL 變數修正)
 const ImagePreview: React.FC<{ url: string, index: number }> = ({ url, index }) => {
   const [status, setStatus] = useState<'loading' | 'loaded' | 'error'>('loading');
 
@@ -20,6 +20,7 @@ const ImagePreview: React.FC<{ url: string, index: number }> = ({ url, index }) 
     try {
        if (!u.includes('drive.google.com')) return u;
        const idMatch = u.match(/\/d\/([a-zA-Z0-9_-]+)/);
+       // 確保這裡有加 $ 符號，並使用 thumbnail API
        if (idMatch && idMatch[1]) return `https://drive.google.com/thumbnail?id=${idMatch[1]}&sz=w1200`;
        return u;
     } catch { return u; }
@@ -36,6 +37,7 @@ const ImagePreview: React.FC<{ url: string, index: number }> = ({ url, index }) 
               <span className="text-xs font-mono">載入中...</span>
            </div>
         )}
+        
         {status === 'error' ? (
            <div className="flex flex-col items-center justify-center gap-2 text-red-400 p-4">
               <AlertTriangle size={32} />
@@ -46,7 +48,8 @@ const ImagePreview: React.FC<{ url: string, index: number }> = ({ url, index }) 
            <img 
               src={src} 
               alt={`Evidence ${index + 1}`} 
-              className={`w-full h-auto max-h-[80vh] object-contain rounded transition-opacity duration-500 ${status === 'loaded' ? 'opacity-100' : 'opacity-0'}`}
+              // ✅ 修正 CSS：移除 w-full，改為 max-w-full w-auto h-auto，確保完整顯示不裁切
+              className={`max-w-full max-h-[80vh] w-auto h-auto object-contain rounded shadow-sm transition-opacity duration-500 ${status === 'loaded' ? 'opacity-100' : 'opacity-0'}`}
               onLoad={() => setStatus('loaded')}
               onError={() => setStatus('error')}
            />
