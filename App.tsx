@@ -238,7 +238,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-100 via-gray-100 to-gray-200 relative">
+    <div className={`min-h-screen flex justify-center p-4 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-100 via-gray-100 to-gray-200 relative ${user ? 'items-start pt-10 md:pt-14' : 'items-center'}`}>
       <div className="w-full flex justify-center">{renderContent()}</div>
       {user && !user.isAdmin && (<div className="fixed bottom-2 left-2 bg-black/80 text-green-400 p-2 rounded-lg text-[10px] font-mono z-50 shadow-lg pointer-events-none border border-green-800 opacity-80">{debugInfo}</div>)}
       {isSyncing && user && !user.isAdmin && (

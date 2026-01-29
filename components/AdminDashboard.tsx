@@ -458,7 +458,7 @@ const handleViewPhotos = (photoUrlString: string | undefined) => {
                       <th className="p-4 whitespace-nowrap w-24 border-b">稽核日期</th>
                       <th className="p-4 whitespace-nowrap w-48 border-b">交換站名稱</th>
                       <th className="p-4 whitespace-nowrap w-24 border-b">狀態</th>
-                      <th className="p-4 whitespace-nowrap w-32 border-b">PPE/圍籬</th>
+                      <th className="p-4 whitespace-nowrap w-32 border-b">裝備/圈圍</th>
                       <th className="p-4 whitespace-nowrap min-w-[200px] border-b">清潔細節</th>
                       <th className="p-4 whitespace-nowrap w-24 border-b">作業/GNOP</th>
                       <th className="p-4 min-w-[250px] border-b">其他描述</th>
@@ -477,8 +477,8 @@ const handleViewPhotos = (photoUrlString: string | undefined) => {
                           </span>
                         </td>
                         <td className="p-4 whitespace-pre-wrap align-top text-xs leading-relaxed">
-                          <div className={`${rec.ppe && rec.ppe.includes('不') ? 'text-red-600 font-bold' : ''}`}>PPE: {rec.ppe}</div>
-                          <div className={`${rec.fencing && rec.fencing.includes('不') ? 'text-red-600 font-bold' : ''}`}>圍籬: {rec.fencing}</div>
+                          <div className={`${rec.ppe && rec.ppe.includes('不') ? 'text-red-600 font-bold' : ''}`}>裝備: {rec.ppe}</div>
+                          <div className={`${rec.fencing && rec.fencing.includes('不') ? 'text-red-600 font-bold' : ''}`}>圈圍: {rec.fencing}</div>
                         </td>
                         <td className="p-4 whitespace-pre-wrap align-top text-xs leading-relaxed">
                           <div className={rec.boxClean && rec.boxClean.includes('不') ? 'text-red-600' : ''}>箱體: {rec.boxClean}</div>
