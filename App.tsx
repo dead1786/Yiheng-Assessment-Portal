@@ -147,7 +147,16 @@ const App: React.FC = () => {
           isPopping.current = true; 
           const currentView = viewRef.current;
           
-          if (currentView === 'dashboard' && (!event.state || event.state.view !== 'dashboard')) {
+          // 非 dashboard 頁面：直接返回上一個視圖
+          if (currentView !== 'dashboard') {
+              if (event.state && event.state.view) {
+                  setView(event.state.view);
+              } else {
+                  setView('dashboard');
+              }
+          } 
+          // dashboard 頁面：攔截並確認是否離開
+          else if (currentView === 'dashboard' && (!event.state || event.state.view !== 'dashboard')) {
               window.history.pushState({ view: 'dashboard' }, '');
               if (!modalConfigRef.current.isOpen) {
                   showConfirm(
@@ -156,13 +165,11 @@ const App: React.FC = () => {
                       () => {}
                   );
               }
-          } else if (event.state && event.state.view) {
-              setView(event.state.view);
-          } else {
-              setView('dashboard');
           }
+          
           setTimeout(() => { isPopping.current = false; }, 50); 
       }; 
+      
       window.addEventListener('popstate', handlePopState); 
       return () => window.removeEventListener('popstate', handlePopState); 
   }, [showConfirm]);

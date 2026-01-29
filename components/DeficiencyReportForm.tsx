@@ -178,7 +178,7 @@ export const DeficiencyReportForm: React.FC<DeficiencyReportFormProps> = ({ user
                            now.getSeconds().toString().padStart(2, '0');
 
         if (readyPhotos.length > 0) {
-            setStatusMsg(`正在上傳照片 (0/${readyPhotos.length})...`);
+            setStatusMsg(`正在上傳照片 ...`);
             
             const uploadPromises = readyPhotos.map(async (photo, idx) => {
                 setPhotos(prev => prev.map(p => p.id === photo.id ? { ...p, status: 'uploading' } : p));
