@@ -149,39 +149,44 @@ export const DeficiencyReportForm: React.FC<DeficiencyReportFormProps> = ({ user
     if (!formData.targetName) return onAlert("請選擇員工");
     if (!formData.station) return onAlert("請輸入交換站名稱");
 
-    // 檢查是否有還在壓縮的照片
     if (photos.some(p => p.status === 'compressing')) {
         return onAlert("照片正在處理中，請稍候...");
     }
 
     setIsSubmitting(true);
     setProgress(0);
-    setStatusMsg("正在上傳照片...");
+    setStatusMsg("初始化上傳...");
 
     try {
-        // 1. 批次並發上傳 (Parallel Upload)
         const readyPhotos = photos.filter(p => p.status === 'ready' && p.compressedBase64);
         const uploadedUrls: string[] = [];
+        
+        // 計算總步驟：照片數量 + 1 (最後的資料寫入)
+        const totalSteps = readyPhotos.length + 1;
+        let completedSteps = 0;
 
-        // ✅ 新增：取得當前時間後綴 (HHMMSS)，避免檔名重複
+        // 更新進度的輔助函式
+        const updateProgress = () => {
+            completedSteps++;
+            const pct = Math.min(Math.round((completedSteps / totalSteps) * 100), 99);
+            setProgress(pct);
+        };
+
         const now = new Date();
         const timeSuffix = now.getHours().toString().padStart(2, '0') + 
                            now.getMinutes().toString().padStart(2, '0') + 
                            now.getSeconds().toString().padStart(2, '0');
 
         if (readyPhotos.length > 0) {
-            const uploadPromises = readyPhotos.map(async (photo) => {
+            setStatusMsg(`正在上傳照片 (0/${readyPhotos.length})...`);
+            
+            const uploadPromises = readyPhotos.map(async (photo, idx) => {
                 setPhotos(prev => prev.map(p => p.id === photo.id ? { ...p, status: 'uploading' } : p));
                 
                 try {
                     const globalIdx = photos.findIndex(p => p.id === photo.id);
                     const fileNum = globalIdx + 1;
-                    
-                    // 2. 處理檔名：淨化站名 + (序號) + 時間後綴
                     const safeStationName = formData.station.trim().replace(/[\\/:*?"<>|]/g, "_") || "UnknownStation";
-                    
-                    // 邏輯：站名-序號_時間.jpg
-                    // 例如：中山站-1_153022.jpg
                     const newFileName = photos.length > 1 
                         ? `${safeStationName}-${fileNum}_${timeSuffix}.jpg` 
                         : `${safeStationName}_${timeSuffix}.jpg`;
@@ -206,13 +211,13 @@ export const DeficiencyReportForm: React.FC<DeficiencyReportFormProps> = ({ user
                     
                     if (res.success && res.fileUrl) {
                         setPhotos(prev => prev.map(p => p.id === photo.id ? { ...p, status: 'success' } : p));
+                        updateProgress(); // 上傳成功，更新進度
                         return res.fileUrl;
                     } else {
                         throw new Error("Upload Failed");
                     }
                 } catch (err) {
                     setPhotos(prev => prev.map(p => p.id === photo.id ? { ...p, status: 'error' } : p));
-                    console.error(`Photo upload failed`);
                     return null; 
                 }
             });
@@ -229,15 +234,16 @@ export const DeficiencyReportForm: React.FC<DeficiencyReportFormProps> = ({ user
         }
 
         setStatusMsg("正在寫入資料庫...");
-        setProgress(90);
-
+        
         const result = await submitDeficiencyReport(apiUrl, {
             ...formData,
             auditor: user.name,
             photoUrl: uploadedUrls 
         });
         
+        updateProgress(); // 最後一步完成
         setProgress(100);
+        
         onAlert(result.message);
         if (result.success) onBack(); 
         
@@ -265,17 +271,32 @@ export const DeficiencyReportForm: React.FC<DeficiencyReportFormProps> = ({ user
 
   return (
     <div className="w-full max-w-2xl animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
+      
+      {/* 全螢幕遮罩：防止觸控 + 顯示進度 */}
+      {isSubmitting && (
+        <div className="fixed inset-0 bg-black/60 z-[9999] flex flex-col items-center justify-center backdrop-blur-[2px] animate-in fade-in duration-200" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white p-6 rounded-2xl shadow-2xl flex flex-col items-center max-w-xs w-full mx-4">
+            <Loader2 className="w-10 h-10 text-blue-600 animate-spin mb-4" />
+            <h3 className="text-lg font-bold text-gray-800 mb-2">{statusMsg}</h3>
+            
+            <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden mb-2">
+              <div 
+                className="h-full bg-blue-600 transition-all duration-300 ease-out rounded-full"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+            <p className="text-blue-600 font-bold text-sm">{progress}%</p>
+          </div>
+        </div>
+      )}
+
       <button onClick={onBack} className="mb-6 flex items-center text-gray-500 hover:text-gray-800 transition-colors">
         <ArrowLeft className="w-4 h-4 mr-1" /> 返回
       </button>
 
       <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 relative overflow-hidden">
         
-        {isSubmitting && (
-            <div className="absolute top-0 left-0 w-full h-1 bg-gray-100 z-10">
-                <div className="h-full bg-blue-500 transition-all duration-300 ease-out animate-pulse w-full" />
-            </div>
-        )}
+        {/* 已移除舊的頂部 Loader */}
 
         <div className="flex items-center gap-3 mb-8 border-b border-gray-100 pb-4">
              <div className="bg-red-100 p-3 rounded-xl text-red-600">
