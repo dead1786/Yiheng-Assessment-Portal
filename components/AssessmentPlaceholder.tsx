@@ -60,7 +60,21 @@ export const AssessmentPlaceholder: React.FC<AssessmentPlaceholderProps> = ({
           </button>
         </div>
 
-        {/* 卡片 2: 勤務打卡 (已改為外部連結) */}
+        {/* 卡片 2: 維運管理 (稽核回報) - 僅組長級以上顯示 */}
+        {isLeader(user.jobTitle) && (
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center text-center hover:shadow-md transition-shadow group">
+            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-4 text-red-600 group-hover:scale-110 transition-transform">
+              <Wrench size={32} />
+            </div>
+            <h3 className="text-xl font-bold text-gray-800 mb-2">維運管理</h3>
+            <p className="text-gray-500 mb-6 text-sm">現場稽核與缺失回報。</p>
+            <button onClick={onReportDeficiency} className="mt-auto w-full py-2.5 px-4 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium transition-colors flex items-center justify-center">
+              <ClipboardList size={18} className="mr-2"/> 稽核缺失回報
+            </button>
+          </div>
+        )}
+
+        {/* 卡片 3: 勤務打卡 (已改為外部連結) */}
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-blue-100 flex flex-col items-center text-center hover:shadow-md transition-shadow group relative overflow-hidden">
           <div className="absolute top-0 right-0 p-2">
             <span className="flex h-3 w-3">
@@ -73,8 +87,8 @@ export const AssessmentPlaceholder: React.FC<AssessmentPlaceholderProps> = ({
           </div>
           <h3 className="text-xl font-bold text-gray-800 mb-2">勤務打卡</h3>
           <p className="text-gray-500 mb-6 text-sm">前往打卡平台 (需開啟 GPS)</p>
-          <button 
-            onClick={() => window.open('https://yiheng.vercel.app/', '_blank')} 
+          <button
+            onClick={() => window.open('https://yiheng.vercel.app/', '_blank')}
             className="mt-auto w-full py-2.5 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium transition-colors"
           >
             前往打卡
@@ -127,19 +141,6 @@ export const AssessmentPlaceholder: React.FC<AssessmentPlaceholderProps> = ({
           </div>
         </div>
 
-        {/* 卡片 5: 維運管理 (稽核回報) - 僅組長級以上顯示 */}
-        {isLeader(user.jobTitle) && (
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center text-center hover:shadow-md transition-shadow group">
-            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-4 text-red-600 group-hover:scale-110 transition-transform">
-              <Wrench size={32} />
-            </div>
-            <h3 className="text-xl font-bold text-gray-800 mb-2">維運管理</h3>
-            <p className="text-gray-500 mb-6 text-sm">現場稽核與缺失回報。</p>
-            <button onClick={onReportDeficiency} className="mt-auto w-full py-2.5 px-4 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium transition-colors flex items-center justify-center">
-              <ClipboardList size={18} className="mr-2"/> 稽核缺失回報
-            </button>
-          </div>
-        )}
 
       </div>
     </div>

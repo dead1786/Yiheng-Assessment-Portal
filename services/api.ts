@@ -193,6 +193,10 @@ export const submitClockIn = async (apiUrl: string, data: ClockInData): Promise<
   }
 };
 
+export const fetchMaintenanceInfo = async (apiUrl: string, station: string): Promise<{ success: boolean; date?: string; ticketId?: string; message?: string }> => {
+  try { return await apiRequest(apiUrl, { action: 'getMaintenanceInfo', station }); } catch (error) { return { success: false, message: "查詢失敗" }; }
+};
+
 export const fetchClockInStatus = async (apiUrl: string, name: string): Promise<{ success: boolean; todayCount: number; lastRecord?: { time: string; station: string; status: string } }> => {
   try {
     return await apiRequest(apiUrl, { action: 'getClockInStatus', name });

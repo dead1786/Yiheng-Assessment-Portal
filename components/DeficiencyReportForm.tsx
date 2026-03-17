@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { User, Employee } from '../types';
-import { submitDeficiencyReport, fetchEmployeeList, fetchStationList } from '../services/api';
-import { ArrowLeft, Send, Loader2, ClipboardCheck, Upload, Image as ImageIcon, Trash2, CheckCircle, AlertTriangle } from 'lucide-react';
+import { submitDeficiencyReport, fetchEmployeeList, fetchStationList, fetchMaintenanceInfo } from '../services/api';
+import { ArrowLeft, Send, Loader2, ClipboardCheck, Upload, Image as ImageIcon, Trash2, CheckCircle, AlertTriangle, ExternalLink, Calendar as CalendarIcon } from 'lucide-react';
 
 interface DeficiencyReportFormProps {
   user: User;
@@ -37,6 +37,10 @@ export const DeficiencyReportForm: React.FC<DeficiencyReportFormProps> = ({ user
   const [statusMsg, setStatusMsg] = useState("");
   const [progress, setProgress] = useState(0); 
 
+  // 月保養資訊
+  const [maintenanceInfo, setMaintenanceInfo] = useState<{ date: string; ticketId: string } | null>(null);
+  const [loadingMaintenance, setLoadingMaintenance] = useState(false);
+
   // 照片暫存佇列
   const [photos, setPhotos] = useState<PhotoItem[]>([]);
 
@@ -60,6 +64,19 @@ export const DeficiencyReportForm: React.FC<DeficiencyReportFormProps> = ({ user
 
   const handleChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+    if (field === 'station' && value.trim()) {
+      setLoadingMaintenance(true);
+      fetchMaintenanceInfo(apiUrl, value.trim()).then(res => {
+        if (res.success && (res.date || res.ticketId)) {
+          setMaintenanceInfo({ date: res.date || '', ticketId: res.ticketId || '' });
+        } else {
+          setMaintenanceInfo(null);
+        }
+        setLoadingMaintenance(false);
+      });
+    } else if (field === 'station') {
+      setMaintenanceInfo(null);
+    }
   };
 
   // 核心邏輯：選擇檔案後，僅進行「前端壓縮」，不上傳
@@ -321,6 +338,30 @@ export const DeficiencyReportForm: React.FC<DeficiencyReportFormProps> = ({ user
                     <label className="block text-sm font-bold text-gray-700 mb-1">交換站名稱</label>
                     <input type="text" list="station-list" value={formData.station} onChange={e => handleChange('station', e.target.value)} className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none" placeholder="輸入關鍵字搜尋..." />
                     <datalist id="station-list">{stations.map((s, i) => (<option key={i} value={s} />))}</datalist>
+                    {loadingMaintenance && (
+                      <p className="text-xs text-gray-400 mt-1 animate-pulse">查詢月保養資訊中...</p>
+                    )}
+                    {maintenanceInfo && (
+                      <div className="mt-2 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm space-y-1">
+                        <div className="flex items-center text-amber-800">
+                          <CalendarIcon size={14} className="mr-1.5 flex-shrink-0" />
+                          <span>上次月保：<span className="font-semibold">{maintenanceInfo.date || '無紀錄'}</span></span>
+                        </div>
+                        {maintenanceInfo.ticketId && (
+                          <div className="flex items-center">
+                            <ExternalLink size={14} className="mr-1.5 flex-shrink-0 text-blue-600" />
+                            <a
+                              href={`https://prod-gnop-app.gogoro.com/ticket/report/detail/${maintenanceInfo.ticketId}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-600 hover:text-blue-800 underline break-all"
+                            >
+                              {maintenanceInfo.ticketId}
+                            </a>
+                          </div>
+                        )}
+                      </div>
+                    )}
                 </div>
                 <div className="mb-4">
                     <label className="block text-sm font-bold text-gray-700 mb-1">稽核日期</label>
