@@ -37,9 +37,9 @@ export const DeficiencyReportForm: React.FC<DeficiencyReportFormProps> = ({ user
   const [statusMsg, setStatusMsg] = useState("");
   const [progress, setProgress] = useState(0); 
 
-  // 月保養資訊
+  // 月保養資訊 (預載全部，本地查詢)
+  const [maintenanceMap, setMaintenanceMap] = useState<Record<string, { date: string; ticketId: string }>>({});
   const [maintenanceInfo, setMaintenanceInfo] = useState<{ date: string; ticketId: string } | null>(null);
-  const [loadingMaintenance, setLoadingMaintenance] = useState(false);
 
   // 照片暫存佇列
   const [photos, setPhotos] = useState<PhotoItem[]>([]);
@@ -58,24 +58,19 @@ export const DeficiencyReportForm: React.FC<DeficiencyReportFormProps> = ({ user
             setStations(stationRes.stations);
             localStorage.setItem('cache_stations', JSON.stringify(stationRes.stations));
         }
+        const maintRes = await fetchMaintenanceInfo(apiUrl);
+        if (maintRes.success && maintRes.records) {
+            setMaintenanceMap(maintRes.records);
+        }
     };
     fetchData();
   }, [apiUrl, employees.length]);
 
   const handleChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
-    if (field === 'station' && value.trim()) {
-      setLoadingMaintenance(true);
-      fetchMaintenanceInfo(apiUrl, value.trim()).then(res => {
-        if (res.success && (res.date || res.ticketId)) {
-          setMaintenanceInfo({ date: res.date || '', ticketId: res.ticketId || '' });
-        } else {
-          setMaintenanceInfo(null);
-        }
-        setLoadingMaintenance(false);
-      });
-    } else if (field === 'station') {
-      setMaintenanceInfo(null);
+    if (field === 'station') {
+      const info = maintenanceMap[value.trim()];
+      setMaintenanceInfo(info && (info.date || info.ticketId) ? info : null);
     }
   };
 
@@ -338,9 +333,6 @@ export const DeficiencyReportForm: React.FC<DeficiencyReportFormProps> = ({ user
                     <label className="block text-sm font-bold text-gray-700 mb-1">交換站名稱</label>
                     <input type="text" list="station-list" value={formData.station} onChange={e => handleChange('station', e.target.value)} className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none" placeholder="輸入關鍵字搜尋..." />
                     <datalist id="station-list">{stations.map((s, i) => (<option key={i} value={s} />))}</datalist>
-                    {loadingMaintenance && (
-                      <p className="text-xs text-gray-400 mt-1 animate-pulse">查詢月保養資訊中...</p>
-                    )}
                     {maintenanceInfo && (
                       <div className="mt-2 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm space-y-1">
                         <div className="flex items-center text-amber-800">
