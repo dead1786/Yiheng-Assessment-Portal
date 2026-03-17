@@ -66,6 +66,13 @@ export const DeficiencyReportForm: React.FC<DeficiencyReportFormProps> = ({ user
     fetchData();
   }, [apiUrl, employees.length]);
 
+  useEffect(() => {
+    if (formData.station.trim() && Object.keys(maintenanceMap).length > 0) {
+      const info = maintenanceMap[formData.station.trim()];
+      setMaintenanceInfo(info && (info.date || info.ticketId) ? info : null);
+    }
+  }, [maintenanceMap]);
+
   const handleChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     if (field === 'station') {
