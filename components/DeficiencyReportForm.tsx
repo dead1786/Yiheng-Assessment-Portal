@@ -193,7 +193,7 @@ export const DeficiencyReportForm: React.FC<DeficiencyReportFormProps> = ({ user
         };
 
         if (readyPhotos.length > 0) {
-            setStatusMsg(`正在上傳照片 (0/${readyPhotos.length})...`);
+            setStatusMsg(`正在上傳照片 (${readyPhotos.length} 張)...`);
 
             const now = new Date();
             const timeSuffix = now.getHours().toString().padStart(2, '0') +
@@ -201,12 +201,11 @@ export const DeficiencyReportForm: React.FC<DeficiencyReportFormProps> = ({ user
                                now.getSeconds().toString().padStart(2, '0');
             const safeStation = formData.station.trim().replace(/[\\/:*?"<>|]/g, "_") || "UnknownStation";
 
-            // 逐張上傳，避免 GAS 資料夾競態
-            for (let i = 0; i < readyPhotos.length; i++) {
-                const photo = readyPhotos[i];
-                setPhotos(prev => prev.map(p => p.id === photo.id ? { ...p, status: 'uploading' } : p));
-                setStatusMsg(`正在上傳照片 (${i + 1}/${readyPhotos.length})...`);
+            // 標記全部為 uploading
+            setPhotos(prev => prev.map(p => readyPhotos.some(rp => rp.id === p.id) ? { ...p, status: 'uploading' } : p));
 
+            // 並行上傳（GAS 端資料夾鎖防止重複建立）
+            const results = await Promise.all(readyPhotos.map(async (photo) => {
                 const globalIdx = photos.findIndex(p => p.id === photo.id);
                 const fileName = readyPhotos.length > 1
                     ? `${safeStation}-${globalIdx + 1}_${timeSuffix}.jpg`
@@ -225,15 +224,18 @@ export const DeficiencyReportForm: React.FC<DeficiencyReportFormProps> = ({ user
 
                     if (res.success && res.fileUrl) {
                         setPhotos(prev => prev.map(p => p.id === photo.id ? { ...p, status: 'success' } : p));
-                        uploadedUrls.push(res.fileUrl);
                         updateProgress();
+                        return res.fileUrl;
                     } else {
                         throw new Error("Upload Failed");
                     }
                 } catch {
                     setPhotos(prev => prev.map(p => p.id === photo.id ? { ...p, status: 'error' } : p));
+                    return null;
                 }
-            }
+            }));
+
+            results.forEach(url => { if (url) uploadedUrls.push(url); });
         }
 
         // 檢查部分失敗
