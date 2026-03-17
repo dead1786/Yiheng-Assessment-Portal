@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { User, Employee } from '../types';
 import { submitDeficiencyReport, fetchEmployeeList, fetchStationList, fetchMaintenanceInfo } from '../services/api';
-import { ArrowLeft, Send, Loader2, ClipboardCheck, Upload, Image as ImageIcon, Trash2, CheckCircle, AlertTriangle, ExternalLink, Calendar as CalendarIcon } from 'lucide-react';
+import { ArrowLeft, Send, Loader2, ClipboardCheck, Upload, Image as ImageIcon, Trash2, CheckCircle, AlertTriangle, ExternalLink, Calendar as CalendarIcon, X } from 'lucide-react';
 
 interface DeficiencyReportFormProps {
   user: User;
@@ -15,8 +15,8 @@ interface PhotoItem {
   id: string;
   file: File;
   previewUrl: string;
-  status: 'compressing' | 'uploading' | 'success' | 'error';
-  uploadedUrl?: string;
+  status: 'compressing' | 'ready' | 'uploading' | 'success' | 'error';
+  compressedBase64?: string;
 }
 
 export const DeficiencyReportForm: React.FC<DeficiencyReportFormProps> = ({ user, apiUrl, onBack, onAlert }) => {
@@ -43,6 +43,8 @@ export const DeficiencyReportForm: React.FC<DeficiencyReportFormProps> = ({ user
 
   // 照片暫存佇列
   const [photos, setPhotos] = useState<PhotoItem[]>([]);
+  // 放大預覽
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -81,18 +83,13 @@ export const DeficiencyReportForm: React.FC<DeficiencyReportFormProps> = ({ user
     }
   };
 
-  // 核心邏輯：選擇檔案後，壓縮完即背景上傳
+  // 選擇檔案後僅壓縮，送出時才上傳
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       if (e.target.files && e.target.files.length > 0) {
           const newFiles = Array.from(e.target.files) as File[];
 
           const validFiles = newFiles.filter(f => f.size < 20 * 1024 * 1024);
           if (validFiles.length < newFiles.length) onAlert("部分檔案過大 (>20MB) 已被忽略");
-
-          const now = new Date();
-          const timeSuffix = now.getHours().toString().padStart(2, '0') +
-                             now.getMinutes().toString().padStart(2, '0') +
-                             now.getSeconds().toString().padStart(2, '0');
 
           const newItems: PhotoItem[] = validFiles.map(file => ({
               id: Math.random().toString(36).substr(2, 9),
@@ -103,44 +100,18 @@ export const DeficiencyReportForm: React.FC<DeficiencyReportFormProps> = ({ user
 
           setPhotos(prev => [...prev, ...newItems]);
 
-          // 壓縮完即上傳
-          newItems.forEach(async (item, idx) => {
+          // 逐張壓縮（使用 Promise 確保完成）
+          Promise.all(newItems.map(async (item) => {
               try {
                   const compressed = await compressImage(item.file);
-
-                  // 壓縮後檢查 base64 大小 (GAS payload 限制 50MB)
-                  if (compressed.length > 30 * 1024 * 1024) {
-                      setPhotos(cur => cur.map(p => p.id === item.id ? { ...p, status: 'error' } : p));
-                      return;
-                  }
-
-                  setPhotos(cur => cur.map(p => p.id === item.id ? { ...p, status: 'uploading' } : p));
-
-                  const safeStation = formData.station.trim().replace(/[\\/:*?"<>|]/g, "_") || "UnknownStation";
-                  const fileNum = idx + 1;
-                  const fileName = validFiles.length > 1
-                      ? `${safeStation}-${fileNum}_${timeSuffix}.jpg`
-                      : `${safeStation}_${timeSuffix}.jpg`;
-
-                  const response = await fetch(apiUrl, {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                      body: JSON.stringify({
-                          action: 'uploadImage',
-                          data: { fileName, mimeType: 'image/jpeg', base64: compressed, stationName: safeStation }
-                      })
-                  });
-                  const res = await response.json();
-
-                  if (res.success && res.fileUrl) {
-                      setPhotos(cur => cur.map(p => p.id === item.id ? { ...p, status: 'success', uploadedUrl: res.fileUrl } : p));
-                  } else {
-                      throw new Error("Upload Failed");
-                  }
+                  setPhotos(cur => cur.map(p => p.id === item.id
+                      ? { ...p, status: 'ready', compressedBase64: compressed }
+                      : p
+                  ));
               } catch {
                   setPhotos(cur => cur.map(p => p.id === item.id ? { ...p, status: 'error' } : p));
               }
-          });
+          }));
       }
   };
 
@@ -198,31 +169,90 @@ export const DeficiencyReportForm: React.FC<DeficiencyReportFormProps> = ({ user
     if (!formData.targetName) return onAlert("請選擇員工");
     if (!formData.station) return onAlert("請輸入交換站名稱");
 
-    // 檢查是否還有照片在處理中
-    if (photos.some(p => p.status === 'compressing' || p.status === 'uploading')) {
-        return onAlert("照片正在上傳中，請稍候...");
+    if (photos.some(p => p.status === 'compressing')) {
+        return onAlert("照片正在壓縮中，請稍候...");
     }
 
-    // 檢查是否有失敗的照片
     const failedPhotos = photos.filter(p => p.status === 'error');
     if (failedPhotos.length > 0) {
-        return onAlert(`有 ${failedPhotos.length} 張照片上傳失敗，請移除後重試`);
+        return onAlert(`有 ${failedPhotos.length} 張照片處理失敗，請移除後重試`);
     }
 
-    // 收集已上傳的 URL
-    const uploadedUrls = photos.filter(p => p.status === 'success' && p.uploadedUrl).map(p => p.uploadedUrl!);
-
     setIsSubmitting(true);
-    setStatusMsg("正在寫入資料庫...");
-    setProgress(50);
+    setProgress(0);
 
     try {
+        const readyPhotos = photos.filter(p => p.status === 'ready' && p.compressedBase64);
+        const uploadedUrls: string[] = [];
+        const totalSteps = readyPhotos.length + 1;
+        let completedSteps = 0;
+
+        const updateProgress = () => {
+            completedSteps++;
+            setProgress(Math.min(Math.round((completedSteps / totalSteps) * 100), 99));
+        };
+
+        if (readyPhotos.length > 0) {
+            setStatusMsg(`正在上傳照片 (0/${readyPhotos.length})...`);
+
+            const now = new Date();
+            const timeSuffix = now.getHours().toString().padStart(2, '0') +
+                               now.getMinutes().toString().padStart(2, '0') +
+                               now.getSeconds().toString().padStart(2, '0');
+            const safeStation = formData.station.trim().replace(/[\\/:*?"<>|]/g, "_") || "UnknownStation";
+
+            // 逐張上傳，避免 GAS 資料夾競態
+            for (let i = 0; i < readyPhotos.length; i++) {
+                const photo = readyPhotos[i];
+                setPhotos(prev => prev.map(p => p.id === photo.id ? { ...p, status: 'uploading' } : p));
+                setStatusMsg(`正在上傳照片 (${i + 1}/${readyPhotos.length})...`);
+
+                const globalIdx = photos.findIndex(p => p.id === photo.id);
+                const fileName = readyPhotos.length > 1
+                    ? `${safeStation}-${globalIdx + 1}_${timeSuffix}.jpg`
+                    : `${safeStation}_${timeSuffix}.jpg`;
+
+                try {
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                        body: JSON.stringify({
+                            action: 'uploadImage',
+                            data: { fileName, mimeType: 'image/jpeg', base64: photo.compressedBase64, stationName: safeStation }
+                        })
+                    });
+                    const res = await response.json();
+
+                    if (res.success && res.fileUrl) {
+                        setPhotos(prev => prev.map(p => p.id === photo.id ? { ...p, status: 'success' } : p));
+                        uploadedUrls.push(res.fileUrl);
+                        updateProgress();
+                    } else {
+                        throw new Error("Upload Failed");
+                    }
+                } catch {
+                    setPhotos(prev => prev.map(p => p.id === photo.id ? { ...p, status: 'error' } : p));
+                }
+            }
+        }
+
+        // 檢查部分失敗
+        const failedCount = photos.filter(p => p.status === 'error').length;
+        if (photos.length > 0 && uploadedUrls.length === 0) {
+            throw new Error("所有照片上傳失敗，無法送出回報單");
+        }
+        if (failedCount > 0) {
+            throw new Error(`${failedCount} 張照片上傳失敗，請移除失敗照片後重試`);
+        }
+
+        setStatusMsg("正在寫入資料庫...");
         const result = await submitDeficiencyReport(apiUrl, {
             ...formData,
             auditor: user.name,
             photoUrl: uploadedUrls
         });
 
+        updateProgress();
         setProgress(100);
         onAlert(result.message);
         if (result.success) onBack();
@@ -343,41 +373,47 @@ export const DeficiencyReportForm: React.FC<DeficiencyReportFormProps> = ({ user
                 </label>
                 
                 <div className="space-y-3">
-                    {photos.map((photo, idx) => (
-                        <div key={idx} className="flex items-center justify-between bg-white p-2 rounded-lg border border-gray-200 shadow-sm animate-in fade-in slide-in-from-bottom-1">
-                            <div className="flex items-center truncate flex-1 mr-2">
-                                <div className={`w-8 h-8 rounded flex items-center justify-center mr-3 font-bold text-xs flex-shrink-0 transition-colors
-                                    ${photo.status === 'success' ? 'bg-green-100 text-green-600' :
-                                      photo.status === 'error' ? 'bg-red-100 text-red-600' :
-                                      'bg-blue-100 text-blue-600 animate-pulse'}
-                                `}>
-                                    {photo.status === 'success' ? <CheckCircle size={16}/> : 
-                                     photo.status === 'error' ? <AlertTriangle size={16}/> :
-                                     photo.status === 'uploading' ? <Upload size={16} className="animate-bounce"/> :
-                                     photo.status === 'compressing' ? <Loader2 size={16} className="animate-spin"/> :
-                                     idx + 1}
-                                </div>
-                                <div className="flex flex-col truncate">
-                                    <span className="text-sm text-gray-700 truncate max-w-[150px]">{photo.file.name}</span>
-                                    <span className="text-[10px] text-gray-400">
-                                        {photo.status === 'compressing' && '正在壓縮處理...'}
-                                        {photo.status === 'uploading' && '正在上傳雲端...'}
-                                        {photo.status === 'success' && '上傳完成'}
-                                        {photo.status === 'error' && '上傳失敗，請移除重試'}
-                                    </span>
-                                </div>
-                            </div>
-                            <button type="button" onClick={() => removePhoto(photo.id)} className="p-1.5 hover:bg-red-50 text-gray-400 hover:text-red-500 rounded-full transition-colors flex-shrink-0">
-                                <Trash2 size={16} />
+                    {photos.length > 0 && (
+                      <div className="grid grid-cols-3 gap-2">
+                        {photos.map((photo) => (
+                          <div key={photo.id} className="relative group aspect-square rounded-lg overflow-hidden border border-gray-200 bg-white">
+                            <img
+                              src={photo.previewUrl}
+                              alt=""
+                              className="w-full h-full object-cover cursor-pointer"
+                              onClick={() => setPreviewUrl(photo.previewUrl)}
+                            />
+                            {/* 狀態遮罩 */}
+                            {photo.status !== 'ready' && (
+                              <div className={`absolute inset-0 flex items-center justify-center
+                                ${photo.status === 'compressing' ? 'bg-black/40' :
+                                  photo.status === 'uploading' ? 'bg-black/40' :
+                                  photo.status === 'success' ? 'bg-green-500/20' :
+                                  'bg-red-500/30'}`}>
+                                {photo.status === 'compressing' && <Loader2 size={20} className="text-white animate-spin" />}
+                                {photo.status === 'uploading' && <Upload size={20} className="text-white animate-bounce" />}
+                                {photo.status === 'success' && <CheckCircle size={20} className="text-green-600" />}
+                                {photo.status === 'error' && <AlertTriangle size={20} className="text-red-600" />}
+                              </div>
+                            )}
+                            {/* 刪除按鈕 */}
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); removePhoto(photo.id); }}
+                              className="absolute top-1 right-1 w-6 h-6 bg-black/50 hover:bg-red-600 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                              <X size={14} />
                             </button>
-                        </div>
-                    ))}
+                          </div>
+                        ))}
+                      </div>
+                    )}
 
                     <div className="relative mt-2">
-                        <input 
-                            type="file" 
-                            accept="image/*" 
-                            multiple 
+                        <input
+                            type="file"
+                            accept="image/*"
+                            multiple
                             onChange={handleFileChange}
                             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                         />
@@ -420,6 +456,27 @@ export const DeficiencyReportForm: React.FC<DeficiencyReportFormProps> = ({ user
             </button>
         </form>
       </div>
+
+      {/* 照片放大預覽 */}
+      {previewUrl && (
+        <div
+          className="fixed inset-0 bg-black/80 z-[9999] flex items-center justify-center p-4 animate-in fade-in duration-200"
+          onClick={() => setPreviewUrl(null)}
+        >
+          <button
+            onClick={() => setPreviewUrl(null)}
+            className="absolute top-4 right-4 w-10 h-10 bg-white/20 hover:bg-white/40 text-white rounded-full flex items-center justify-center transition-colors z-10"
+          >
+            <X size={24} />
+          </button>
+          <img
+            src={previewUrl}
+            alt=""
+            className="max-w-full max-h-[85vh] object-contain rounded-lg"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
     </div>
   );
 };
