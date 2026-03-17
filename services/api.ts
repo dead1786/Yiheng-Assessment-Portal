@@ -36,27 +36,10 @@ export const submitAdminReview = async (apiUrl: string, rowIndex: number, adminC
 export const fetchEmployeeList = async (apiUrl: string): Promise<EmployeeListResponse> => { try { return await apiRequest(apiUrl, { action: 'getEmployeeList' }); } catch (error) { return { success: false, employees: [], message: "無法載入名單" }; } };
 export const updateEmployeeList = async (apiUrl: string, employees: Employee[]): Promise<{ success: boolean; message: string }> => { try { return await apiRequest(apiUrl, { action: 'updateEmployeeList', employees }); } catch (error) { return { success: false, message: "更新失敗" }; } };
 
-export const fetchDeficiencyRecords = async (apiUrl: string, name?: string): Promise<{ success: boolean; records: DeficiencyRecord[]; message?: string; kpi?: string | number; user?: any }> => { 
-  try { 
-    const recordsPromise = apiRequest<{ success: boolean; records: DeficiencyRecord[] }>(apiUrl, { action: 'getDeficiencyRecords', name: name || "" })
-      .catch(async () => {
-         const url = `${apiUrl}${apiUrl.includes('?') ? '&' : '?'}action=getDeficiencyRecords&name=${encodeURIComponent(name || "")}`;
-         const res = await fetch(url);
-         return await res.json();
-      });
-    const usersPromise = fetchUsers(apiUrl);
-    const [data, users] = await Promise.all([recordsPromise, usersPromise]);
-    let finalKpi = '';
-    if (name && users && Array.isArray(users)) {
-        const foundUser = users.find(u => u.name === name);
-        if (foundUser) finalKpi = foundUser.kpi || '';
-    }
-    return { 
-        success: data.success ?? (Array.isArray(data) || Array.isArray((data as any).records)), 
-        records: (data as any).records || (Array.isArray(data) ? data : []),
-        kpi: finalKpi,
-    };
-  } catch (error) { return { success: false, records: [], message: "無法載入稽核紀錄" }; } 
+export const fetchDeficiencyRecords = async (apiUrl: string, name?: string): Promise<{ success: boolean; records: DeficiencyRecord[]; message?: string }> => {
+  try {
+    return await apiRequest(apiUrl, { action: 'getDeficiencyRecords', name: name || "" });
+  } catch (error) { return { success: false, records: [], message: "無法載入稽核紀錄" }; }
 };
 
 export const fetchShiftSchedule = async <T = any>(apiUrl: string, name?: string): Promise<ShiftScheduleResponse<T>> => { try { return await apiRequest(apiUrl, { action: 'getShiftSchedule', name: name || "" }); } catch (error) { return { success: false, shifts: [], message: "無法載入班表" }; } };

@@ -97,9 +97,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ user, apiUrl, onBack, 
       if (data.success) {
         setDeficiencies(data.records);
         localStorage.setItem(`cache_profile_${user.name}`, JSON.stringify(data.records));
-        if (data.kpi !== undefined && data.kpi !== '') {
-            setKpiValue(data.kpi);
-        }
       }
     } catch (e) { console.error("Sync failed"); } 
     finally { 
