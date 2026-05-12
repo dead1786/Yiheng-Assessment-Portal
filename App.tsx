@@ -11,7 +11,7 @@ import { DeficiencyReportForm } from './components/DeficiencyReportForm';
 import { AuditRecordsView } from './components/AuditRecordsView';
 // ✅ 新增引用外部 ErrorBoundary
 import { ErrorBoundary } from './components/ErrorBoundary';
-import { authenticateEmployee, checkLoginStatus } from './services/api'; 
+import { authenticateEmployee, checkLoginStatus, fetchMyAuditRecords } from './services/api';
 import { User } from './types';
 import { AlertTriangle, Cloud } from 'lucide-react';
 
@@ -142,6 +142,15 @@ const App: React.FC = () => {
     const timer = setInterval(performSync, 10000);
     return () => clearInterval(timer);
   }, [user, apiUrl, performSync]);
+
+  // 預先在背景載入稽核紀錄，使用者進入頁面時立刻有資料
+  const preloadName = user && !user.isAdmin ? user.name : null;
+  useEffect(() => {
+    if (!preloadName || !apiUrl) return;
+    fetchMyAuditRecords(apiUrl, preloadName)
+      .then(res => { if (res.success) localStorage.setItem(`audit_records_${preloadName}`, JSON.stringify(res.records)); })
+      .catch(() => {});
+  }, [preloadName, apiUrl]);
 
   useEffect(() => { 
       const handlePopState = (event: PopStateEvent) => { 

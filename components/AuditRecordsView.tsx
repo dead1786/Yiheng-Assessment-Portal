@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { User, DeficiencyRecord } from '../types';
 import { fetchMyAuditRecords } from '../services/api';
-import { AlertTriangle, ArrowLeft, Loader2, Image as ImageIcon, X, ChevronRight } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Loader2, Image as ImageIcon, X, ChevronRight, Cloud } from 'lucide-react';
 
 const SingleImage: React.FC<{ url: string; index: number }> = ({ url, index }) => {
   const [status, setStatus] = useState<'loading' | 'loaded' | 'error'>('loading');
@@ -51,22 +51,38 @@ interface AuditRecordsViewProps {
 }
 
 export const AuditRecordsView: React.FC<AuditRecordsViewProps> = ({ user, apiUrl, onBack }) => {
-  const [records, setRecords] = useState<DeficiencyRecord[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const cacheKey = `audit_records_${user.name}`;
+
+  const [records, setRecords] = useState<DeficiencyRecord[]>(() => {
+    try { return JSON.parse(localStorage.getItem(cacheKey) || '[]'); } catch { return []; }
+  });
+  const [isLoading, setIsLoading] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(cacheKey) || '[]').length === 0; } catch { return true; }
+  });
+  const [isSyncing, setIsSyncing] = useState(false);
   const [selectedPerson, setSelectedPerson] = useState<{ name: string; records: DeficiencyRecord[] } | null>(null);
   const [viewingPhotos, setViewingPhotos] = useState<string[] | null>(null);
 
   useEffect(() => {
-    (async () => {
-      setIsLoading(true);
-      const res = await fetchMyAuditRecords(apiUrl, user.name);
-      if (res.success) setRecords(res.records);
-      setIsLoading(false);
-    })();
+    const hasCache = records.length > 0;
+    if (!hasCache) setIsLoading(true);
+    setIsSyncing(true);
+
+    fetchMyAuditRecords(apiUrl, user.name)
+      .then(res => {
+        if (res.success) {
+          setRecords(res.records);
+          localStorage.setItem(cacheKey, JSON.stringify(res.records));
+        }
+      })
+      .finally(() => {
+        setIsLoading(false);
+        setIsSyncing(false);
+      });
   }, [apiUrl, user.name]);
 
-  // 依被稽核者分組，並按最新稽核日期排序
-  const grouped: { name: string; records: DeficiencyRecord[]; latestDate: number }[] = React.useMemo(() => {
+  // 依被稽核者分組，按最新稽核日期排序
+  const grouped = React.useMemo(() => {
     const map: Record<string, DeficiencyRecord[]> = {};
     records.forEach(r => {
       if (!map[r.name]) map[r.name] = [];
@@ -96,6 +112,15 @@ export const AuditRecordsView: React.FC<AuditRecordsViewProps> = ({ user, apiUrl
 
   return (
     <div className="w-full max-w-6xl animate-in fade-in slide-in-from-bottom-4 duration-500">
+
+      {/* 背景同步指示器 */}
+      {isSyncing && (
+        <div className="fixed bottom-8 right-8 z-50 bg-orange-100/90 border border-orange-200 text-orange-700 px-4 py-2 rounded-full shadow-xl flex items-center gap-2 animate-bounce pointer-events-none backdrop-blur-sm">
+          <Cloud size={16} />
+          <span className="text-xs font-bold">正在同步最新資料...</span>
+        </div>
+      )}
+
       <header className="flex items-center gap-4 mb-6">
         <button onClick={onBack} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
           <ArrowLeft size={24} className="text-gray-600" />
@@ -162,10 +187,16 @@ export const AuditRecordsView: React.FC<AuditRecordsViewProps> = ({ user, apiUrl
         )}
       </div>
 
-      {/* 詳細紀錄 Modal（與管理員樣式相同） */}
+      {/* 詳細紀錄 Modal：點空白處關閉 */}
       {selectedPerson && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 backdrop-blur-sm animate-in fade-in duration-200"
+          onClick={() => setSelectedPerson(null)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[85vh] overflow-hidden flex flex-col"
+            onClick={e => e.stopPropagation()}
+          >
             <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
               <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
                 <AlertTriangle className="text-red-500" size={20} />
@@ -246,7 +277,7 @@ export const AuditRecordsView: React.FC<AuditRecordsViewProps> = ({ user, apiUrl
         </div>
       )}
 
-      {/* 照片瀏覽 Modal */}
+      {/* 照片瀏覽 Modal：點空白處關閉 */}
       {viewingPhotos && (
         <div
           className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-in fade-in duration-200"
