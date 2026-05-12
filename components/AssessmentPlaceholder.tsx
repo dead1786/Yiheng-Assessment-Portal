@@ -109,34 +109,6 @@ export const AssessmentPlaceholder: React.FC<AssessmentPlaceholderProps> = ({
           </button>
         </div>
 
-        {/* 卡片 4: 升階考核 */}
-        <div className={`bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center text-center transition-shadow ${user.canAssess ? 'hover:shadow-md group' : 'bg-gray-50'}`}>
-          <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-4 transition-transform ${user.canAssess ? 'bg-emerald-100 text-emerald-600 group-hover:scale-110' : 'bg-gray-200 text-gray-400'}`}>
-            {user.canAssess ? <ClipboardList size={32} /> : <Lock size={32} />}
-          </div>
-          <h3 className="text-xl font-bold text-gray-800 mb-2">升階考核</h3>
-          <p className="text-gray-500 mb-6 text-sm">
-            {user.canAssess ? "進行本季績效評估。" : "目前無需考核或未開放。"}
-          </p>
-          <div className="mt-auto w-full space-y-2">
-             <button 
-                onClick={onStartAssessment}
-                disabled={!user.canAssess}
-                className={`w-full py-2.5 px-4 rounded-lg font-medium transition-colors ${
-                  user.canAssess 
-                    ? 'bg-emerald-600 text-white hover:bg-emerald-700' 
-                    : 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                }`}
-              >
-                {user.canAssess ? "進入考核" : "未開放"}
-             </button>
-             <button onClick={onViewHistory} className="w-full py-2.5 px-4 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium transition-colors flex items-center justify-center">
-                <CheckCircle2 size={16} className="mr-2"/> 歷史紀錄
-             </button>
-          </div>
-        </div>
-
-
       </div>
     </div>
   );

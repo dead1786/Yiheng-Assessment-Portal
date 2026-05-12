@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { User, AssessmentRecord, Employee, DeficiencyRecord, FullShift } from '../types';
 import { fetchAdminData, updateAdminPassword, submitAdminReview, fetchEmployeeList, updateEmployeeList, kickUser, fetchDeficiencyRecords, fetchShiftSchedule, fetchOfficeList } from '../services/api';
-import { LogOut, Users, Save, Loader2, RefreshCw, KeyRound, AlertTriangle, ChevronRight, Calendar, UserPlus, Trash2, Power, Settings, Cloud, X, Link, MapPin, Globe, Image as ImageIcon, MessageSquare, Star } from 'lucide-react';
+import { LogOut, Users, Save, Loader2, RefreshCw, KeyRound, AlertTriangle, ChevronRight, Calendar, UserPlus, Trash2, Power, Settings, Cloud, X, Link, MapPin, Globe, Image as ImageIcon, MessageSquare, Star, ExternalLink } from 'lucide-react';
 import { FullScheduleView } from './FullScheduleView';
 
 interface AdminDashboardProps {
@@ -463,6 +463,7 @@ const handleViewPhotos = (photoUrlString: string | undefined) => {
                     <tr>
                       <th className="p-4 whitespace-nowrap w-24 border-b">稽核日期</th>
                       <th className="p-4 whitespace-nowrap w-48 border-b">交換站名稱</th>
+                      <th className="p-4 whitespace-nowrap w-36 border-b">工單號碼</th>
                       <th className="p-4 whitespace-nowrap w-24 border-b">狀態</th>
                       <th className="p-4 whitespace-nowrap w-32 border-b">裝備/圈圍</th>
                       <th className="p-4 whitespace-nowrap min-w-[200px] border-b">清潔細節</th>
@@ -477,6 +478,21 @@ const handleViewPhotos = (photoUrlString: string | undefined) => {
                       <tr key={i} className="hover:bg-gray-50 transition-colors">
                         <td className="p-4 whitespace-nowrap font-mono text-gray-500 align-top">{formatDate(rec.date)}</td>
                         <td className="p-4 whitespace-nowrap font-medium text-gray-900 align-top">{rec.station}</td>
+                        <td className="p-4 whitespace-nowrap align-top">
+                          {rec.ticketUrl ? (
+                            <a
+                              href={rec.ticketUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 underline font-mono text-xs"
+                            >
+                              {rec.ticketUrl.split('/').pop()}
+                              <ExternalLink size={11} />
+                            </a>
+                          ) : (
+                            <span className="text-gray-300 text-xs">-</span>
+                          )}
+                        </td>
                         <td className="p-4 whitespace-nowrap align-top">
                           <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${rec.status === '待改善' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
                             {rec.status}
