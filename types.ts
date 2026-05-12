@@ -36,7 +36,7 @@ export interface DeficiencyRecord {
   name: string;
   station: string;
   date: string;
-  status: string; // ✅ 補上這個缺少的欄位
+  status: string;
   ppe: string;
   fencing: string;
   boxClean: string;
@@ -46,6 +46,7 @@ export interface DeficiencyRecord {
   other: string;
   auditor?: string;
   photoUrl?: string;
+  ticketUrl?: string;
 }
 
 export interface AssessmentRecord {
@@ -136,6 +137,7 @@ export interface DeficiencyReportData {
   other: string;
   photoUrl?: string[];
   auditor: string;
+  ticketNo?: string;
 }
 
 export interface UpdateScheduleRequest {

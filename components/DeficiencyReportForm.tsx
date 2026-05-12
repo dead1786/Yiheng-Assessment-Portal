@@ -23,7 +23,7 @@ export const DeficiencyReportForm: React.FC<DeficiencyReportFormProps> = ({ user
   const [formData, setFormData] = useState({
     targetName: '', station: '', date: new Date().toISOString().split('T')[0],
     status: '施作中', ppe: '', fencing: '', boxClean: '', siteClean: '',
-    order: '', gnop: '', other: ''
+    order: '', gnop: '', other: '', ticketNo: ''
   });
 
   const [employees, setEmployees] = useState<Employee[]>(() => {
@@ -359,6 +359,29 @@ export const DeficiencyReportForm: React.FC<DeficiencyReportFormProps> = ({ user
                     <label className="block text-sm font-bold text-gray-700 mb-1">稽核日期</label>
                     <input type="date" value={formData.date} onChange={e => handleChange('date', e.target.value)} className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none" />
                 </div>
+            </div>
+            <div className="mb-4">
+                <label className="block text-sm font-bold text-gray-700 mb-1">
+                  工單號碼 <span className="text-gray-400 font-normal text-xs">（選填）</span>
+                </label>
+                <input
+                  type="text"
+                  value={formData.ticketNo}
+                  onChange={e => handleChange('ticketNo', e.target.value.trim())}
+                  className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none font-mono"
+                  placeholder="例如：GNT2605859689"
+                />
+                {formData.ticketNo && (
+                  <a
+                    href={`https://prod-gnop.gogoro.com/ticket/management/search/detail/${formData.ticketNo}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-1 inline-flex items-center text-xs text-blue-600 hover:text-blue-800 underline"
+                  >
+                    <ExternalLink size={11} className="mr-1" />
+                    預覽連結
+                  </a>
+                )}
             </div>
             <div className="mb-4">
                 <label className="block text-sm font-bold text-gray-700 mb-1">施作狀況</label>
