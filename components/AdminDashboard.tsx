@@ -431,8 +431,14 @@ const handleViewPhotos = (photoUrlString: string | undefined) => {
 
       {/* 2. 稽核紀錄詳細 Modal (已優化排序與寬度) */}
       {selectedDeficiencyUser && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 backdrop-blur-sm animate-in fade-in duration-200"
+          onClick={() => setSelectedDeficiencyUser(null)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[85vh] overflow-hidden flex flex-col"
+            onClick={e => e.stopPropagation()}
+          >
             <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
               <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
                 <AlertTriangle className="text-red-500" size={20} />
@@ -522,8 +528,14 @@ const handleViewPhotos = (photoUrlString: string | undefined) => {
 
       {/* 3. 考核評分 Modal */}
       {selectedRecord && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 backdrop-blur-sm animate-in fade-in duration-200"
+          onClick={() => setSelectedRecord(null)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden"
+            onClick={e => e.stopPropagation()}
+          >
             <div className="flex justify-between items-center p-5 border-b border-gray-100 bg-gray-50">
                <div>
                   <h3 className="text-xl font-bold text-gray-800">{selectedRecord.name} 的考核詳情</h3>
