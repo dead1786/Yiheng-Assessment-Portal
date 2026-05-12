@@ -176,6 +176,12 @@ export const submitClockIn = async (apiUrl: string, data: ClockInData): Promise<
   }
 };
 
+export const fetchMyAuditRecords = async (apiUrl: string, name: string): Promise<{ success: boolean; records: DeficiencyRecord[]; message?: string }> => {
+  try {
+    return await apiRequest(apiUrl, { action: 'getMyDeficiencyAudits', name });
+  } catch (error) { return { success: false, records: [], message: "無法載入稽核紀錄" }; }
+};
+
 export const fetchMaintenanceInfo = async (apiUrl: string): Promise<{ success: boolean; records?: Record<string, { date: string; ticketId: string }>; message?: string }> => {
   try { return await apiRequest(apiUrl, { action: 'getMaintenanceInfo' }); } catch (error) { return { success: false, message: "查詢失敗" }; }
 };

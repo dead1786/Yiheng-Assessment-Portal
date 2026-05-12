@@ -8,6 +8,7 @@ import { ProfileView } from './components/ProfileView';
 import { ScheduleView } from './components/ScheduleView';
 import { FullScheduleView } from './components/FullScheduleView';
 import { DeficiencyReportForm } from './components/DeficiencyReportForm';
+import { AuditRecordsView } from './components/AuditRecordsView';
 // ✅ 新增引用外部 ErrorBoundary
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { authenticateEmployee, checkLoginStatus } from './services/api'; 
@@ -50,7 +51,7 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  const [view, setView] = useState<'dashboard' | 'form' | 'history' | 'profile' | 'schedule' | 'full-schedule' | 'report-deficiency'>('dashboard');
+  const [view, setView] = useState<'dashboard' | 'form' | 'history' | 'profile' | 'schedule' | 'full-schedule' | 'report-deficiency' | 'audit-records'>('dashboard');
   const [apiUrl, setApiUrl] = useState(() => localStorage.getItem('gas_api_url') || '');
   const [questions, setQuestions] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem('app_session') || '{}').questions || []; } catch { return []; } });
   const [debugInfo, setDebugInfo] = useState<string>("連線檢查中...");
@@ -229,6 +230,7 @@ const App: React.FC = () => {
       case 'schedule': return <ScheduleView user={user} apiUrl={apiUrl} onBack={forceToDashboard} />;
       case 'full-schedule': return <FullScheduleView apiUrl={apiUrl} onBack={forceToDashboard} canEdit={user.canEditSchedule} onAlert={showAlert} />;
       case 'report-deficiency': return <DeficiencyReportForm user={user} apiUrl={apiUrl} onBack={forceToDashboard} onAlert={showAlert} />;
+      case 'audit-records': return <AuditRecordsView user={user} apiUrl={apiUrl} onBack={forceToDashboard} />;
       case 'dashboard': default: return (
         <AssessmentPlaceholder 
             user={user} 
@@ -237,8 +239,9 @@ const App: React.FC = () => {
             onViewHistory={() => setView('history')} 
             onViewProfile={() => setView('profile')} 
             onViewSchedule={() => setView('schedule')} 
-            onViewFullSchedule={() => setView('full-schedule')} 
+            onViewFullSchedule={() => setView('full-schedule')}
             onReportDeficiency={() => setView('report-deficiency')}
+            onViewAuditRecords={() => setView('audit-records')}
         />
       );
     }

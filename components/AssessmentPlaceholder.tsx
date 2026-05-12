@@ -1,6 +1,6 @@
 import React from 'react';
 import { User } from '../types';
-import { LogOut, ClipboardList, CheckCircle2, UserCircle, Lock, Calendar, LayoutGrid, Navigation, Wrench } from 'lucide-react';
+import { LogOut, ClipboardList, CheckCircle2, UserCircle, Lock, Calendar, LayoutGrid, Navigation, Wrench, AlertTriangle } from 'lucide-react';
 
 interface AssessmentPlaceholderProps {
   user: User;
@@ -11,17 +11,19 @@ interface AssessmentPlaceholderProps {
   onViewSchedule: () => void;
   onViewFullSchedule: () => void;
   onReportDeficiency: () => void;
+  onViewAuditRecords: () => void;
 }
 
-export const AssessmentPlaceholder: React.FC<AssessmentPlaceholderProps> = ({ 
-  user, 
-  onLogout, 
-  onStartAssessment, 
+export const AssessmentPlaceholder: React.FC<AssessmentPlaceholderProps> = ({
+  user,
+  onLogout,
+  onStartAssessment,
   onViewHistory,
   onViewProfile,
   onViewSchedule,
   onViewFullSchedule,
-  onReportDeficiency
+  onReportDeficiency,
+  onViewAuditRecords
 }) => {
   
   const isLeader = (title?: string) => {
@@ -95,23 +97,16 @@ export const AssessmentPlaceholder: React.FC<AssessmentPlaceholderProps> = ({
           </button>
         </div>
 
-        {/* 卡片 3: 勤務班表 */}
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center text-center hover:shadow-md transition-shadow group">
-          <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mb-4 text-indigo-600 group-hover:scale-110 transition-transform">
-            <Calendar size={32} />
+        {/* 稽核紀錄 */}
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-orange-100 flex flex-col items-center text-center hover:shadow-md transition-shadow group">
+          <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mb-4 text-orange-600 group-hover:scale-110 transition-transform">
+            <AlertTriangle size={32} />
           </div>
-          <h3 className="text-xl font-bold text-gray-800 mb-2">勤務班表</h3>
-          <p className="text-gray-500 mb-6 text-sm">查看個人或全體排班狀況。</p>
-          <div className="mt-auto w-full space-y-2">
-             <button onClick={onViewSchedule} className="w-full py-2.5 px-4 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium transition-colors">
-                我的班表
-             </button>
-             {canSeeFullSchedule && (
-                <button onClick={onViewFullSchedule} className="w-full py-2.5 px-4 bg-white border border-indigo-200 text-indigo-700 rounded-lg hover:bg-indigo-50 font-medium transition-colors flex items-center justify-center">
-                    <LayoutGrid size={16} className="mr-2"/> 全體總表
-                </button>
-             )}
-          </div>
+          <h3 className="text-xl font-bold text-gray-800 mb-2">稽核紀錄</h3>
+          <p className="text-gray-500 mb-6 text-sm">查看由我填寫的現場稽核紀錄。</p>
+          <button onClick={onViewAuditRecords} className="mt-auto w-full py-2.5 px-4 bg-orange-500 text-white rounded-lg hover:bg-orange-600 font-medium transition-colors">
+            查看紀錄
+          </button>
         </div>
 
         {/* 卡片 4: 升階考核 */}
