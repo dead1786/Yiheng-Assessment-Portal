@@ -11,9 +11,9 @@ import { DeficiencyReportForm } from './components/DeficiencyReportForm';
 import { AuditRecordsView } from './components/AuditRecordsView';
 // ✅ 新增引用外部 ErrorBoundary
 import { ErrorBoundary } from './components/ErrorBoundary';
-import { authenticateEmployee, checkLoginStatus, fetchMyAuditRecords } from './services/api';
+import { authenticateEmployee, checkLoginStatus, fetchMyAuditRecords, changePassword } from './services/api';
 import { User } from './types';
-import { AlertTriangle, Cloud } from 'lucide-react';
+import { AlertTriangle, Cloud, Lock, Loader2, Eye, EyeOff } from 'lucide-react';
 
 // ✅ 原本這裡的 ErrorBoundary 類別定義已全部移除，改用 import
 
@@ -29,6 +29,72 @@ const ModalDialog = ({ isOpen, type, message, onConfirm, onCancel }: any) => {
             {type === 'confirm' && (<button onClick={onCancel} className="flex-1 py-2.5 bg-gray-100 text-gray-700 rounded-xl font-bold hover:bg-gray-200 transition-colors">取消</button>)}
             <button onClick={onConfirm} className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-200 transition-colors">確定</button>
           </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const ChangePasswordModal = ({ isOpen, userName, apiUrl, onClose, onAlert }: { isOpen: boolean; userName: string; apiUrl: string; onClose: () => void; onAlert: (msg: string) => Promise<void> }) => {
+  const [currentPwd, setCurrentPwd] = useState('');
+  const [newPwd, setNewPwd] = useState('');
+  const [confirmPwd, setConfirmPwd] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [showCurrent, setShowCurrent] = useState(false);
+  const [showNew, setShowNew] = useState(false);
+
+  if (!isOpen) return null;
+
+  const handleSubmit = async () => {
+    if (!currentPwd) { onAlert("請輸入目前密碼"); return; }
+    if (!newPwd) { onAlert("請輸入新密碼"); return; }
+    if (newPwd.length < 4) { onAlert("新密碼至少 4 個字元"); return; }
+    if (newPwd !== confirmPwd) { onAlert("兩次輸入的新密碼不一致"); return; }
+    if (newPwd === currentPwd) { onAlert("新密碼不能與舊密碼相同"); return; }
+    setSaving(true);
+    try {
+      const res = await changePassword(apiUrl, userName, currentPwd, newPwd);
+      await onAlert(res.message);
+      if (res.success) { setCurrentPwd(''); setNewPwd(''); setConfirmPwd(''); onClose(); }
+    } catch { onAlert("連線錯誤"); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center gap-2 mb-6">
+          <Lock size={20} className="text-blue-600" />
+          <h3 className="text-lg font-bold text-gray-800">修改密碼</h3>
+        </div>
+        <div className="space-y-4">
+          <div>
+            <label className="block text-xs font-bold text-gray-500 mb-1">目前密碼</label>
+            <div className="relative">
+              <input type={showCurrent ? "text" : "password"} value={currentPwd} onChange={e => setCurrentPwd(e.target.value)} className="w-full p-3 border border-gray-200 rounded-lg font-mono tracking-wider pr-10" placeholder="輸入目前密碼" />
+              <button type="button" onClick={() => setShowCurrent(!showCurrent)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                {showCurrent ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-gray-500 mb-1">新密碼</label>
+            <div className="relative">
+              <input type={showNew ? "text" : "password"} value={newPwd} onChange={e => setNewPwd(e.target.value)} className="w-full p-3 border border-gray-200 rounded-lg font-mono tracking-wider pr-10" placeholder="輸入新密碼" />
+              <button type="button" onClick={() => setShowNew(!showNew)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                {showNew ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-gray-500 mb-1">確認新密碼</label>
+            <input type="password" value={confirmPwd} onChange={e => setConfirmPwd(e.target.value)} className="w-full p-3 border border-gray-200 rounded-lg font-mono tracking-wider" placeholder="再次輸入新密碼" />
+          </div>
+          <button onClick={handleSubmit} disabled={saving} className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-colors flex items-center justify-center shadow-md">
+            {saving ? <Loader2 className="animate-spin mr-2 h-5 w-5" /> : null}
+            {saving ? '儲存中...' : '確認修改'}
+          </button>
+          <button onClick={onClose} className="w-full py-2.5 bg-gray-100 text-gray-600 rounded-xl font-medium hover:bg-gray-200 transition-colors">取消</button>
         </div>
       </div>
     </div>
@@ -56,7 +122,8 @@ const App: React.FC = () => {
   const [questions, setQuestions] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem('app_session') || '{}').questions || []; } catch { return []; } });
   const [debugInfo, setDebugInfo] = useState<string>("連線檢查中...");
   const [modalConfig, setModalConfig] = useState<{ isOpen: boolean; type: 'alert' | 'confirm'; message: string; onConfirm: () => void; onCancel?: () => void; }>({ isOpen: false, type: 'alert', message: '', onConfirm: () => {} });
-  
+  const [showChangePassword, setShowChangePassword] = useState(false);
+
   const isPopping = useRef(false);
   const viewRef = useRef(view);
   const modalConfigRef = useRef(modalConfig);
@@ -188,12 +255,12 @@ const App: React.FC = () => {
 
   const forceToDashboard = () => setView('dashboard');
   
-  const handleLogin = async (name: string, otp: string, url: string) => {
-    setIsLoading(true); setError(null); setApiUrl(url); localStorage.setItem('gas_api_url', url); 
+  const handleLogin = async (name: string, password: string, url: string) => {
+    setIsLoading(true); setError(null); setApiUrl(url); localStorage.setItem('gas_api_url', url);
     setIsSyncing(true);
 
     try {
-      const response = await authenticateEmployee(url, name, otp);
+      const response = await authenticateEmployee(url, name, password);
       if (response.success) {
         const userData: User = { 
           name, 
@@ -241,16 +308,17 @@ const App: React.FC = () => {
       case 'report-deficiency': return <DeficiencyReportForm user={user} apiUrl={apiUrl} onBack={forceToDashboard} onAlert={showAlert} />;
       case 'audit-records': return <AuditRecordsView user={user} apiUrl={apiUrl} onBack={forceToDashboard} />;
       case 'dashboard': default: return (
-        <AssessmentPlaceholder 
-            user={user} 
-            onLogout={requestLogout} 
-            onStartAssessment={() => setView('form')} 
-            onViewHistory={() => setView('history')} 
-            onViewProfile={() => setView('profile')} 
-            onViewSchedule={() => setView('schedule')} 
+        <AssessmentPlaceholder
+            user={user}
+            onLogout={requestLogout}
+            onStartAssessment={() => setView('form')}
+            onViewHistory={() => setView('history')}
+            onViewProfile={() => setView('profile')}
+            onViewSchedule={() => setView('schedule')}
             onViewFullSchedule={() => setView('full-schedule')}
             onReportDeficiency={() => setView('report-deficiency')}
             onViewAuditRecords={() => setView('audit-records')}
+            onChangePassword={() => setShowChangePassword(true)}
         />
       );
     }
@@ -267,6 +335,7 @@ const App: React.FC = () => {
         </div>
       )}
       <ModalDialog isOpen={modalConfig.isOpen} type={modalConfig.type} message={modalConfig.message} onConfirm={modalConfig.onConfirm} onCancel={modalConfig.onCancel} />
+      {user && !user.isAdmin && <ChangePasswordModal isOpen={showChangePassword} userName={user.name} apiUrl={apiUrl} onClose={() => setShowChangePassword(false)} onAlert={showAlert} />}
     </div>
   );
 };

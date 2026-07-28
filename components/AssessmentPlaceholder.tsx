@@ -12,6 +12,7 @@ interface AssessmentPlaceholderProps {
   onViewFullSchedule: () => void;
   onReportDeficiency: () => void;
   onViewAuditRecords: () => void;
+  onChangePassword: () => void;
 }
 
 export const AssessmentPlaceholder: React.FC<AssessmentPlaceholderProps> = ({
@@ -23,7 +24,8 @@ export const AssessmentPlaceholder: React.FC<AssessmentPlaceholderProps> = ({
   onViewSchedule,
   onViewFullSchedule,
   onReportDeficiency,
-  onViewAuditRecords
+  onViewAuditRecords,
+  onChangePassword
 }) => {
   
   const isLeader = (title?: string) => {
@@ -41,6 +43,9 @@ export const AssessmentPlaceholder: React.FC<AssessmentPlaceholderProps> = ({
            <h1 className="text-3xl font-bold text-gray-900 text-center md:text-left">益恆科技-維運平台</h1>
            <div className="flex flex-col md:flex-row items-center gap-2 mt-1">
              <p className="text-gray-500">歡迎回來，<span className="font-semibold text-blue-600">{user.name}</span></p>
+             <button onClick={onChangePassword} className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-gray-500 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors border border-gray-200">
+               <Lock size={12} /> 修改密碼
+             </button>
            </div>
         </div>
         <button onClick={onLogout} className="flex items-center px-4 py-2 text-sm font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors border border-red-200">

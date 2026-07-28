@@ -26,10 +26,12 @@ export interface Employee {
   permission: boolean;
   color: string;
   canEditSchedule: boolean;
-  annualLeave: string;      // ✅ 新增
-  annualLeaveUsed: string;  // ✅ 新增
-  assignedStation?: string; // ✅ 新增
-  allowRemote?: boolean;    // ✅ 新增
+  annualLeave: string;
+  annualLeaveUsed: string;
+  assignedStation?: string;
+  allowRemote?: boolean;
+  password?: string;
+  hasPassword?: boolean;
 }
 
 export interface DeficiencyRecord {

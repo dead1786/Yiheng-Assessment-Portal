@@ -148,10 +148,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
   };
 
   const handleAddEmployee = () => {
-    const newEmp: Employee = { 
-        name: '新員工', joinDate: '', jobTitle: '職稱', yearsOfService: '0', jobGrade: '1', jobGradeBonus: '0', 
-        kpi: '', salary: '0', permission: true, color: '#ffffff', canEditSchedule: false, 
-        annualLeave: '0', annualLeaveUsed: '0', assignedStation: '', allowRemote: false 
+    const newEmp: Employee = {
+        name: '新員工', joinDate: '', jobTitle: '職稱', yearsOfService: '0', jobGrade: '1', jobGradeBonus: '0',
+        kpi: '', salary: '0', permission: true, color: '#ffffff', canEditSchedule: false,
+        annualLeave: '0', annualLeaveUsed: '0', assignedStation: '', allowRemote: false,
+        password: ''
     };
     setEmployees([...employees, newEmp]);
   };
@@ -386,6 +387,22 @@ const handleViewPhotos = (photoUrlString: string | undefined) => {
                         <div><label className="text-xs text-gray-500">到職日</label><input type="text" value={managingEmployee.joinDate} onChange={(e) => handleEmployeeChange(managingEmployee.name, 'joinDate', e.target.value)} className="w-full p-2 border rounded bg-white" /></div>
                         <div><label className="text-xs text-gray-500">職等加給</label><input type="text" value={managingEmployee.jobGradeBonus} onChange={(e) => handleEmployeeChange(managingEmployee.name, 'jobGradeBonus', e.target.value)} className="w-full p-2 border rounded bg-white" /></div>
                         <div><label className="text-xs text-gray-500">代表色</label><input type="color" value={managingEmployee.color || '#ffffff'} onChange={(e) => handleEmployeeChange(managingEmployee.name, 'color', e.target.value)} className="w-full h-8 p-0 border rounded cursor-pointer" /></div>
+                    </div>
+
+                    <div className="space-y-3 p-4 bg-amber-50 rounded-xl border border-amber-200">
+                        <h4 className="text-xs font-bold text-amber-500 uppercase tracking-wider mb-2 flex items-center gap-1"><KeyRound size={12}/> 登入密碼</h4>
+                        <div className="flex items-center gap-2 mb-2">
+                            <span className="text-xs font-bold">狀態：</span>
+                            {managingEmployee.hasPassword ? (
+                                <span className="text-[10px] font-bold px-2 py-0.5 bg-green-100 text-green-700 rounded-full border border-green-200">已設定</span>
+                            ) : (
+                                <span className="text-[10px] font-bold px-2 py-0.5 bg-gray-100 text-gray-500 rounded-full border border-gray-200">預設 (abc123)</span>
+                            )}
+                        </div>
+                        <div>
+                            <input type="text" value={managingEmployee.password || ''} onChange={(e) => handleEmployeeChange(managingEmployee.name, 'password', e.target.value)} className="w-full p-2 border border-amber-200 rounded bg-white font-mono tracking-wider" placeholder="輸入新密碼以重設（留空不變）" />
+                            <p className="text-[10px] text-amber-600 mt-1">儲存後密碼會自動加密</p>
+                        </div>
                     </div>
 
                     <div className="space-y-2 p-4 bg-indigo-50 rounded-xl border border-indigo-100">
