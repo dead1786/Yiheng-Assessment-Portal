@@ -20,7 +20,7 @@ import { AlertTriangle, Cloud, Lock, Loader2, Eye, EyeOff } from 'lucide-react';
 const ModalDialog = ({ isOpen, type, message, onConfirm, onCancel }: any) => {
   if (!isOpen) return null;
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 transform transition-all scale-100">
         <div className="flex flex-col items-center text-center gap-4">
           <div className={`p-3 rounded-full ${type === 'alert' ? 'bg-blue-100 text-blue-600' : 'bg-yellow-100 text-yellow-600'}`}><AlertTriangle size={32} /></div>
