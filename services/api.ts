@@ -1,7 +1,7 @@
-import { 
-  AuthResponse, AssessmentRecord, AdminDataResponse, Employee, EmployeeListResponse, 
-  DeficiencyRecord, Shift, FullShift, ShiftScheduleResponse, DeficiencyReportData, 
-  UpdateScheduleRequest, User, ClockInData, ClockInResponse 
+import {
+  AuthResponse, AssessmentRecord, AdminDataResponse, Employee, EmployeeListResponse,
+  DeficiencyRecord, AnyDeficiencyRecord, Shift, FullShift, ShiftScheduleResponse, DeficiencyReportData,
+  UpdateScheduleRequest, User, ClockInData, ClockInResponse
 } from '../types';
 
 async function apiRequest<T>(apiUrl: string, payload: any): Promise<T> {
@@ -37,7 +37,7 @@ export const submitAdminReview = async (apiUrl: string, rowIndex: number, adminC
 export const fetchEmployeeList = async (apiUrl: string): Promise<EmployeeListResponse> => { try { return await apiRequest(apiUrl, { action: 'getEmployeeList' }); } catch (error) { return { success: false, employees: [], message: "無法載入名單" }; } };
 export const updateEmployeeList = async (apiUrl: string, employees: Employee[]): Promise<{ success: boolean; message: string }> => { try { return await apiRequest(apiUrl, { action: 'updateEmployeeList', employees }); } catch (error) { return { success: false, message: "更新失敗" }; } };
 
-export const fetchDeficiencyRecords = async (apiUrl: string, name?: string): Promise<{ success: boolean; records: DeficiencyRecord[]; message?: string }> => {
+export const fetchDeficiencyRecords = async (apiUrl: string, name?: string): Promise<{ success: boolean; records: AnyDeficiencyRecord[]; message?: string }> => {
   try {
     return await apiRequest(apiUrl, { action: 'getDeficiencyRecords', name: name || "" });
   } catch (error) { return { success: false, records: [], message: "無法載入稽核紀錄" }; }
@@ -177,7 +177,7 @@ export const submitClockIn = async (apiUrl: string, data: ClockInData): Promise<
   }
 };
 
-export const fetchMyAuditRecords = async (apiUrl: string, name: string): Promise<{ success: boolean; records: DeficiencyRecord[]; message?: string }> => {
+export const fetchMyAuditRecords = async (apiUrl: string, name: string): Promise<{ success: boolean; records: AnyDeficiencyRecord[]; message?: string }> => {
   try {
     return await apiRequest(apiUrl, { action: 'getMyDeficiencyAudits', name });
   } catch (error) { return { success: false, records: [], message: "無法載入稽核紀錄" }; }

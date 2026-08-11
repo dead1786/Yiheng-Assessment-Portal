@@ -125,22 +125,43 @@ export interface ShiftScheduleResponse<T> {
   colorMap?: Record<string, string>;
 }
 
+// 新版稽核回報送出格式（寫入「缺失紀錄表」）
 export interface DeficiencyReportData {
+  zone: string;            // 分區 N1/N2/C1/C2/S1/S2
   targetName: string;
   station: string;
   date: string;
-  status: string;
-  ppe: string;
-  fencing: string;
-  boxClean: string;
-  siteClean: string;
-  order: string;
-  gnop: string;
-  other: string;
+  auditType: string;       // 工單/月保養/半年保養/年度保養
+  ticketNo?: string;
+  hasDeficiency: string;   // 無缺失/有缺失
+  deficiencies: Record<string, { text: string; score: string }>;
   photoUrl?: string[];
   auditor: string;
-  ticketNo?: string;
 }
+
+// ===== 稽核紀錄顯示（新舊格式並存） =====
+export interface DeficiencyItemV2 {
+  label: string;   // 缺失項目分類名稱
+  text: string;    // 缺失內容
+  count: string;   // 缺失筆數
+}
+
+export interface DeficiencyRecordV2 {
+  version: 'v2';
+  zone: string;
+  name: string;
+  station: string;
+  date: string;
+  auditType: string;
+  ticketNo?: string;
+  ticketUrl?: string;
+  items: DeficiencyItemV2[];  // 空陣列 = 無缺失
+  photoUrl?: string;
+  auditor?: string;
+}
+
+export type DeficiencyRecordV1 = DeficiencyRecord & { version?: 'v1' };
+export type AnyDeficiencyRecord = DeficiencyRecordV1 | DeficiencyRecordV2;
 
 export interface UpdateScheduleRequest {
   date: string;

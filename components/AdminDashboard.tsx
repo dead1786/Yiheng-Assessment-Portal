@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { User, AssessmentRecord, Employee, DeficiencyRecord, FullShift } from '../types';
+import { User, AssessmentRecord, Employee, AnyDeficiencyRecord, FullShift } from '../types';
 import { fetchAdminData, updateAdminPassword, submitAdminReview, fetchEmployeeList, updateEmployeeList, kickUser, fetchDeficiencyRecords, fetchShiftSchedule, fetchOfficeList } from '../services/api';
-import { LogOut, Users, Save, Loader2, RefreshCw, KeyRound, AlertTriangle, ChevronRight, Calendar, UserPlus, Trash2, Power, Settings, Cloud, X, Link, MapPin, Globe, Image as ImageIcon, MessageSquare, Star, ExternalLink } from 'lucide-react';
+import { LogOut, Users, Save, Loader2, RefreshCw, KeyRound, AlertTriangle, ChevronRight, Calendar, UserPlus, Trash2, Power, Settings, Cloud, X, Link, MapPin, Globe, Image as ImageIcon, MessageSquare, Star, ExternalLink, BarChart3 } from 'lucide-react';
 import { FullScheduleView } from './FullScheduleView';
+import { DeficiencyRecordList } from './DeficiencyRecordList';
+import { AuditStatsDashboard } from './AuditStatsDashboard';
 
 interface AdminDashboardProps {
   user: User;
@@ -71,7 +73,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
   
   const [records, setRecords] = useState<AssessmentRecord[]>(() => { try { return JSON.parse(localStorage.getItem('admin_records') || '[]'); } catch { return []; } });
   const [employees, setEmployees] = useState<Employee[]>(() => { try { return JSON.parse(localStorage.getItem('admin_employees') || '[]'); } catch { return []; } });
-  const [allDeficiencies, setAllDeficiencies] = useState<DeficiencyRecord[]>(() => { try { return JSON.parse(localStorage.getItem('admin_deficiencies') || '[]'); } catch { return []; } });
+  const [allDeficiencies, setAllDeficiencies] = useState<AnyDeficiencyRecord[]>(() => { try { return JSON.parse(localStorage.getItem('admin_deficiencies') || '[]'); } catch { return []; } });
+  const [auditStatsOpen, setAuditStatsOpen] = useState(false);
   
   const [isLoading, setIsLoading] = useState(records.length === 0 && employees.length === 0);
   const [isSyncing, setIsSyncing] = useState(!isLoading); 
@@ -82,7 +85,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
 
   // Modal 狀態
   const [selectedRecord, setSelectedRecord] = useState<AssessmentRecord | null>(null);
-  const [selectedDeficiencyUser, setSelectedDeficiencyUser] = useState<{name: string, records: DeficiencyRecord[]} | null>(null);
+  const [selectedDeficiencyUser, setSelectedDeficiencyUser] = useState<{name: string, records: AnyDeficiencyRecord[]} | null>(null);
   const [adminReview, setAdminReview] = useState({ comment: '', score: '' });
   const [managingEmployee, setManagingEmployee] = useState<Employee | null>(null);
 
@@ -206,9 +209,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
     return getLatestDate(b.name) - getLatestDate(a.name);
   });
 
-  // ✅ 統計今日筆數
+  // ✅ 統計今日筆數（正規化日期格式，同時支援 v1「/」與 v2「-」格式）
   const todayDateStr = new Date().toLocaleDateString('zh-TW', {year:'numeric',month:'2-digit',day:'2-digit'}).replace(/\//g, '/');
-  const todayDeficiencyCount = allDeficiencies.filter(d => d.date === todayDateStr).length;
+  const normalizeDate = (s: string) => {
+    try {
+      const d = new Date(s);
+      if (isNaN(d.getTime())) return s;
+      return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`;
+    } catch { return s; }
+  };
+  const todayDeficiencyCount = allDeficiencies.filter(d => normalizeDate(d.date) === todayDateStr).length;
 
   // ✅ 新增狀態：控制照片彈窗
   const [viewingPhotos, setViewingPhotos] = useState<string[] | null>(null);
@@ -307,6 +317,15 @@ const handleViewPhotos = (photoUrlString: string | undefined) => {
           </div>
         </div>
       ) : activeTab === 'deficiencies' ? (
+        auditStatsOpen ? (
+          <div className="flex justify-center">
+            <AuditStatsDashboard
+              records={allDeficiencies}
+              mode="multi"
+              onBack={() => setAuditStatsOpen(false)}
+            />
+          </div>
+        ) : (
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
           <div className="flex justify-between items-center mb-6">
             <div className="flex flex-col">
@@ -323,6 +342,12 @@ const handleViewPhotos = (photoUrlString: string | undefined) => {
                 </span>
               </div>
             </div>
+            <button
+              onClick={() => setAuditStatsOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white text-xs font-bold rounded-lg hover:bg-blue-700 shadow-sm transition-all active:scale-95"
+            >
+              <BarChart3 size={14} /> 統計表
+            </button>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -360,6 +385,7 @@ const handleViewPhotos = (photoUrlString: string | undefined) => {
             })}
           </div>
         </div>
+        )
       ) : activeTab === 'schedule' ? (
         <FullScheduleView apiUrl={apiUrl} onBack={() => {}} canEdit={true} onAlert={onAlert} />
       ) : (
@@ -475,79 +501,14 @@ const handleViewPhotos = (photoUrlString: string | undefined) => {
                    <p>該員工目前無任何稽核紀錄</p>
                 </div>
               ) : (
-                <table className="w-full text-left text-sm border-collapse">
-                  <thead className="bg-gray-50 text-gray-700 font-bold sticky top-0 z-10">
-                    <tr>
-                      <th className="p-4 whitespace-nowrap w-24 border-b">稽核日期</th>
-                      <th className="p-4 whitespace-nowrap w-48 border-b">交換站名稱</th>
-                      <th className="p-4 whitespace-nowrap w-36 border-b">工單號碼</th>
-                      <th className="p-4 whitespace-nowrap w-24 border-b">狀態</th>
-                      <th className="p-4 whitespace-nowrap w-32 border-b">裝備/圈圍</th>
-                      <th className="p-4 whitespace-nowrap min-w-[200px] border-b">清潔細節</th>
-                      <th className="p-4 whitespace-nowrap w-24 border-b">作業/GNOP</th>
-                      <th className="p-4 min-w-[250px] border-b">其他描述</th>
-                      <th className="p-4 whitespace-nowrap w-20 border-b text-center">照片</th>
-                      <th className="p-4 whitespace-nowrap w-24 border-b">稽核員</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {selectedDeficiencyUser.records.map((rec, i) => (
-                      <tr key={i} className="hover:bg-gray-50 transition-colors">
-                        <td className="p-4 whitespace-nowrap font-mono text-gray-500 align-top">{formatDate(rec.date)}</td>
-                        <td className="p-4 whitespace-nowrap font-medium text-gray-900 align-top">{rec.station}</td>
-                        <td className="p-4 whitespace-nowrap align-top">
-                          {rec.ticketUrl ? (
-                            <a
-                              href={rec.ticketUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 underline font-mono text-xs"
-                            >
-                              {rec.ticketUrl.split('/').pop()}
-                              <ExternalLink size={11} />
-                            </a>
-                          ) : (
-                            <span className="text-gray-300 text-xs">-</span>
-                          )}
-                        </td>
-                        <td className="p-4 whitespace-nowrap align-top">
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${rec.status === '待改善' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
-                            {rec.status}
-                          </span>
-                        </td>
-                        <td className="p-4 whitespace-pre-wrap align-top text-xs leading-relaxed">
-                          <div className={`${rec.ppe && rec.ppe.includes('不') ? 'text-red-600 font-bold' : ''}`}>裝備: {rec.ppe}</div>
-                          <div className={`${rec.fencing && rec.fencing.includes('不') ? 'text-red-600 font-bold' : ''}`}>圈圍: {rec.fencing}</div>
-                        </td>
-                        <td className="p-4 whitespace-pre-wrap align-top text-xs leading-relaxed">
-                          <div className={rec.boxClean && rec.boxClean.includes('不') ? 'text-red-600' : ''}>箱體: {rec.boxClean}</div>
-                          <div className={rec.siteClean && rec.siteClean.includes('不') ? 'text-red-600' : ''}>環境: {rec.siteClean}</div>
-                        </td>
-                        <td className="p-4 whitespace-pre-wrap align-top text-xs leading-relaxed">
-                          <div>順序: {rec.order}</div>
-                          <div>GNOP: {rec.gnop}</div>
-                        </td>
-                        <td className="p-4 whitespace-pre-wrap text-gray-600 align-top leading-relaxed text-xs">
-                          {rec.other}
-                        </td>
-                        <td className="p-4 align-top text-center">
-                            {rec.photoUrl ? (
-                                <button 
-                                    onClick={() => handleViewPhotos(rec.photoUrl)}
-                                    className="p-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 hover:text-blue-700 transition-colors"
-                                    title="查看照片"
-                                >
-                                    <ImageIcon size={16} />
-                                </button>
-                            ) : (
-                                <span className="text-gray-300">-</span>
-                            )}
-                        </td>
-                        <td className="p-4 whitespace-nowrap text-gray-400 align-top text-xs">{rec.auditor || '-'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <div className="p-4">
+                  <DeficiencyRecordList
+                    records={selectedDeficiencyUser.records}
+                    showAuditor={true}
+                    showName={false}
+                    onViewPhotos={handleViewPhotos}
+                  />
+                </div>
               )}
             </div>
             <div className="p-4 bg-gray-50 border-t border-gray-100">

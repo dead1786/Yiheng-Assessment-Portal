@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { User, DeficiencyRecord } from '../types';
+import { User, AnyDeficiencyRecord } from '../types';
 import { fetchDeficiencyRecords } from '../services/api';
-import { ArrowLeft, User as UserIcon, AlertTriangle, Loader2, Award, Cloud, RefreshCw, Palmtree, Image as ImageIcon, X } from 'lucide-react';
+import { DeficiencyRecordList } from './DeficiencyRecordList';
+import { AuditStatsDashboard } from './AuditStatsDashboard';
+import { ArrowLeft, User as UserIcon, AlertTriangle, Loader2, Award, Cloud, RefreshCw, Palmtree, X, BarChart3 } from 'lucide-react';
 
 interface ProfileViewProps {
   user: User;
@@ -72,14 +74,15 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ user, apiUrl, onBack, 
     return u.kpi || u.KPI || u.Kpi || u.score || u.Score || u.grade;
   });
 
-  const [deficiencies, setDeficiencies] = useState<DeficiencyRecord[]>(() => {
+  const [deficiencies, setDeficiencies] = useState<AnyDeficiencyRecord[]>(() => {
       try { return JSON.parse(localStorage.getItem(`cache_profile_${user.name}`) || '[]'); } catch { return []; }
   });
 
   const [isLoading, setIsLoading] = useState(deficiencies.length === 0);
   const [isSyncing, setIsSyncing] = useState(deficiencies.length > 0);
-  const [kpiLoading, setKpiLoading] = useState(false); 
+  const [kpiLoading, setKpiLoading] = useState(false);
   const [viewingPhotos, setViewingPhotos] = useState<string[] | null>(null);
+  const [statsOpen, setStatsOpen] = useState(false);
 
   // 獨立的資料載入函式
   const loadData = async (forceRefresh = false) => {
@@ -186,6 +189,17 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ user, apiUrl, onBack, 
       }
   };
 
+  // 統計表模式
+  if (statsOpen) {
+    return (
+      <AuditStatsDashboard
+        records={deficiencies}
+        mode="personal"
+        onBack={() => setStatsOpen(false)}
+      />
+    );
+  }
+
   return (
     <div className="w-full max-w-5xl animate-in fade-in slide-in-from-bottom-4 duration-500 relative">
       {isSyncing && (
@@ -262,7 +276,16 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ user, apiUrl, onBack, 
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mb-8">
         <div className="p-6 border-b border-gray-100 bg-red-50/50">
-          <div className="flex items-center gap-3"><AlertTriangle className="w-6 h-6 text-red-500" /><h3 className="text-xl font-bold text-gray-900">稽核紀錄</h3></div>
+          <div className="flex items-center gap-3">
+            <AlertTriangle className="w-6 h-6 text-red-500" />
+            <h3 className="text-xl font-bold text-gray-900">稽核紀錄</h3>
+            <button
+              onClick={() => setStatsOpen(true)}
+              className="ml-auto flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white text-xs font-bold rounded-lg hover:bg-blue-700 shadow-sm transition-all active:scale-95"
+            >
+              <BarChart3 size={14} /> 統計表
+            </button>
+          </div>
         </div>
 
         {isLoading ? (
@@ -270,59 +293,14 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ user, apiUrl, onBack, 
         ) : deficiencies.length === 0 ? (
           <div className="text-center py-20 text-gray-400"><p>目前沒有任何稽核紀錄。</p></div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm border-collapse">
-              <thead className="bg-gray-50 text-gray-700 font-bold">
-                <tr>
-                  {/* ✅ 設定欄位寬度與禁止換行 */}
-                  <th className="p-4 whitespace-nowrap w-32 border-b">稽核日期</th>
-                  <th className="p-4 whitespace-nowrap w-48 border-b">交換站名稱</th>
-                  <th className="p-4 whitespace-nowrap w-24 border-b">施作狀況</th>
-                  <th className="p-4 whitespace-nowrap w-24 border-b">防護裝備</th>
-                  <th className="p-4 whitespace-nowrap w-24 border-b">圈圍架設</th>
-                  <th className="p-4 whitespace-nowrap min-w-[200px] border-b">清潔(箱內/現場)</th>
-                  <th className="p-4 whitespace-nowrap w-24 border-b">作業順序</th>
-                  <th className="p-4 whitespace-nowrap w-24 border-b">GNOP</th>
-                  <th className="p-4 min-w-[250px] border-b">其他問題</th>
-                  <th className="p-4 whitespace-nowrap w-20 border-b text-center">照片</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {/* ✅ 新增排序：最新的日期排在第一行 */}
-                {[...deficiencies].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map((record, idx) => (
-                  <tr key={idx} className="hover:bg-gray-50 transition-colors">
-                    <td className="p-4 whitespace-nowrap font-mono text-gray-500 align-top">{formatDate(record.date)}</td>
-                    <td className="p-4 whitespace-nowrap font-medium text-gray-900 align-top">{record.station}</td>
-                    <td className="p-4 whitespace-nowrap align-top">{record.status}</td>
-                    <td className={`p-4 whitespace-nowrap align-top ${record.ppe && record.ppe.includes('不') ? 'text-red-600 font-bold' : 'text-green-600'}`}>{record.ppe}</td>
-                    <td className={`p-4 whitespace-nowrap align-top ${record.fencing && record.fencing.includes('不') ? 'text-red-600 font-bold' : 'text-green-600'}`}>{record.fencing}</td>
-                    {/* ✅ 使用 whitespace-pre-wrap 保留資料原始換行，不再隨機切斷 */}
-                    <td className="p-4 whitespace-pre-wrap leading-relaxed align-top">
-                      <div className="flex flex-col gap-1">
-                        <span className={record.boxClean && record.boxClean.includes('不') ? 'text-red-600' : ''}>內: {record.boxClean}</span>
-                        <span className={record.siteClean && record.siteClean.includes('不') ? 'text-red-600' : ''}>外: {record.siteClean}</span>
-                      </div>
-                    </td>
-                    <td className="p-4 whitespace-nowrap align-top">{record.order}</td>
-                    <td className="p-4 whitespace-nowrap align-top">{record.gnop}</td>
-                    <td className="p-4 whitespace-pre-wrap text-gray-600 leading-relaxed align-top">{record.other}</td>
-                  <td className="p-4 align-top text-center">
-                        {record.photoUrl ? (
-                            <button 
-                                onClick={() => handleViewPhotos(record.photoUrl)}
-                                className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 hover:text-blue-700 transition-colors"
-                                title="查看照片"
-                            >
-                                <ImageIcon size={20} />
-                            </button>
-                        ) : (
-                            <span className="text-gray-300">-</span>
-                        )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="p-4">
+            {/* 個人視角：不顯示稽核員 */}
+            <DeficiencyRecordList
+              records={deficiencies}
+              showAuditor={false}
+              showName={false}
+              onViewPhotos={handleViewPhotos}
+            />
           </div>
         )}
       </div>

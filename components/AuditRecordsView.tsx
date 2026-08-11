@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { User, DeficiencyRecord } from '../types';
+import { User, AnyDeficiencyRecord } from '../types';
 import { fetchMyAuditRecords } from '../services/api';
-import { AlertTriangle, ArrowLeft, Loader2, Image as ImageIcon, X, ChevronRight, Cloud, ExternalLink } from 'lucide-react';
+import { DeficiencyRecordList } from './DeficiencyRecordList';
+import { AuditStatsDashboard } from './AuditStatsDashboard';
+import { AlertTriangle, ArrowLeft, Loader2, X, ChevronRight, Cloud, BarChart3 } from 'lucide-react';
 
 const SingleImage: React.FC<{ url: string; index: number }> = ({ url, index }) => {
   const [status, setStatus] = useState<'loading' | 'loaded' | 'error'>('loading');
@@ -53,15 +55,16 @@ interface AuditRecordsViewProps {
 export const AuditRecordsView: React.FC<AuditRecordsViewProps> = ({ user, apiUrl, onBack }) => {
   const cacheKey = `audit_records_${user.name}`;
 
-  const [records, setRecords] = useState<DeficiencyRecord[]>(() => {
+  const [records, setRecords] = useState<AnyDeficiencyRecord[]>(() => {
     try { return JSON.parse(localStorage.getItem(cacheKey) || '[]'); } catch { return []; }
   });
   const [isLoading, setIsLoading] = useState(() => {
     try { return JSON.parse(localStorage.getItem(cacheKey) || '[]').length === 0; } catch { return true; }
   });
   const [isSyncing, setIsSyncing] = useState(false);
-  const [selectedPerson, setSelectedPerson] = useState<{ name: string; records: DeficiencyRecord[] } | null>(null);
+  const [selectedPerson, setSelectedPerson] = useState<{ name: string; records: AnyDeficiencyRecord[] } | null>(null);
   const [viewingPhotos, setViewingPhotos] = useState<string[] | null>(null);
+  const [statsOpen, setStatsOpen] = useState(false);
 
   useEffect(() => {
     const hasCache = records.length > 0;
@@ -83,7 +86,7 @@ export const AuditRecordsView: React.FC<AuditRecordsViewProps> = ({ user, apiUrl
 
   // 依被稽核者分組，按最新稽核日期排序
   const grouped = React.useMemo(() => {
-    const map: Record<string, DeficiencyRecord[]> = {};
+    const map: Record<string, AnyDeficiencyRecord[]> = {};
     records.forEach(r => {
       if (!map[r.name]) map[r.name] = [];
       map[r.name].push(r);
@@ -110,6 +113,17 @@ export const AuditRecordsView: React.FC<AuditRecordsViewProps> = ({ user, apiUrl
     if (group) setSelectedPerson({ name, records: group.records });
   };
 
+  // 統計表模式
+  if (statsOpen) {
+    return (
+      <AuditStatsDashboard
+        records={records}
+        mode="multi"
+        onBack={() => setStatsOpen(false)}
+      />
+    );
+  }
+
   return (
     <div className="w-full max-w-6xl animate-in fade-in slide-in-from-bottom-4 duration-500">
 
@@ -132,6 +146,12 @@ export const AuditRecordsView: React.FC<AuditRecordsViewProps> = ({ user, apiUrl
           </h1>
           <p className="text-sm text-gray-500 mt-0.5">稽核員：{user.name}</p>
         </div>
+        <button
+          onClick={() => setStatsOpen(true)}
+          className="ml-auto flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white text-xs font-bold rounded-lg hover:bg-blue-700 shadow-sm transition-all active:scale-95"
+        >
+          <BarChart3 size={14} /> 統計表
+        </button>
       </header>
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
@@ -207,78 +227,13 @@ export const AuditRecordsView: React.FC<AuditRecordsViewProps> = ({ user, apiUrl
               </button>
             </div>
 
-            <div className="overflow-auto flex-1 bg-white">
-              <table className="w-full text-left text-sm border-collapse">
-                <thead className="bg-gray-50 text-gray-700 font-bold sticky top-0 z-10">
-                  <tr>
-                    <th className="p-4 whitespace-nowrap w-24 border-b">稽核日期</th>
-                    <th className="p-4 whitespace-nowrap w-48 border-b">交換站名稱</th>
-                    <th className="p-4 whitespace-nowrap w-36 border-b">工單號碼</th>
-                    <th className="p-4 whitespace-nowrap w-24 border-b">狀態</th>
-                    <th className="p-4 whitespace-nowrap w-32 border-b">裝備/圈圍</th>
-                    <th className="p-4 whitespace-nowrap min-w-[200px] border-b">清潔細節</th>
-                    <th className="p-4 whitespace-nowrap w-24 border-b">作業/GNOP</th>
-                    <th className="p-4 min-w-[250px] border-b">其他描述</th>
-                    <th className="p-4 whitespace-nowrap w-20 border-b text-center">照片</th>
-                    <th className="p-4 whitespace-nowrap w-24 border-b">稽核員</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {selectedPerson.records.map((rec, i) => (
-                    <tr key={i} className="hover:bg-gray-50 transition-colors">
-                      <td className="p-4 whitespace-nowrap font-mono text-gray-500 align-top">{formatDate(rec.date)}</td>
-                      <td className="p-4 whitespace-nowrap font-medium text-gray-900 align-top">{rec.station}</td>
-                      <td className="p-4 whitespace-nowrap align-top">
-                        {rec.ticketUrl ? (
-                          <a
-                            href={rec.ticketUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 underline font-mono text-xs"
-                          >
-                            {rec.ticketUrl.split('/').pop()}
-                            <ExternalLink size={11} />
-                          </a>
-                        ) : (
-                          <span className="text-gray-300 text-xs">-</span>
-                        )}
-                      </td>
-                      <td className="p-4 whitespace-nowrap align-top">
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${rec.status === '待改善' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
-                          {rec.status}
-                        </span>
-                      </td>
-                      <td className="p-4 whitespace-pre-wrap align-top text-xs leading-relaxed">
-                        <div className={rec.ppe && rec.ppe.includes('不') ? 'text-red-600 font-bold' : ''}>裝備: {rec.ppe}</div>
-                        <div className={rec.fencing && rec.fencing.includes('不') ? 'text-red-600 font-bold' : ''}>圈圍: {rec.fencing}</div>
-                      </td>
-                      <td className="p-4 whitespace-pre-wrap align-top text-xs leading-relaxed">
-                        <div className={rec.boxClean && rec.boxClean.includes('不') ? 'text-red-600' : ''}>箱體: {rec.boxClean}</div>
-                        <div className={rec.siteClean && rec.siteClean.includes('不') ? 'text-red-600' : ''}>環境: {rec.siteClean}</div>
-                      </td>
-                      <td className="p-4 whitespace-pre-wrap align-top text-xs leading-relaxed">
-                        <div>順序: {rec.order}</div>
-                        <div>GNOP: {rec.gnop}</div>
-                      </td>
-                      <td className="p-4 whitespace-pre-wrap text-gray-600 align-top leading-relaxed text-xs">{rec.other}</td>
-                      <td className="p-4 align-top text-center">
-                        {rec.photoUrl ? (
-                          <button
-                            onClick={() => handleViewPhotos(rec.photoUrl)}
-                            className="p-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 hover:text-blue-700 transition-colors"
-                            title="查看照片"
-                          >
-                            <ImageIcon size={16} />
-                          </button>
-                        ) : (
-                          <span className="text-gray-300">-</span>
-                        )}
-                      </td>
-                      <td className="p-4 whitespace-nowrap text-gray-400 align-top text-xs">{rec.auditor || '-'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="overflow-auto flex-1 bg-white p-4">
+              <DeficiencyRecordList
+                records={selectedPerson.records}
+                showAuditor={true}
+                showName={false}
+                onViewPhotos={handleViewPhotos}
+              />
             </div>
 
             <div className="p-4 bg-gray-50 border-t border-gray-100">

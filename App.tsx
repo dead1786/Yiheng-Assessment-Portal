@@ -7,7 +7,7 @@ import { HistoryView } from './components/HistoryView';
 import { ProfileView } from './components/ProfileView';
 import { ScheduleView } from './components/ScheduleView';
 import { FullScheduleView } from './components/FullScheduleView';
-import { DeficiencyReportForm } from './components/DeficiencyReportForm';
+import { DeficiencyReportFormV2 } from './components/DeficiencyReportFormV2';
 import { AuditRecordsView } from './components/AuditRecordsView';
 // ✅ 新增引用外部 ErrorBoundary
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -305,7 +305,7 @@ const App: React.FC = () => {
       case 'profile': return <ProfileView user={user} apiUrl={apiUrl} onBack={forceToDashboard} onRefresh={handleManualRefresh} />;
       case 'schedule': return <ScheduleView user={user} apiUrl={apiUrl} onBack={forceToDashboard} />;
       case 'full-schedule': return <FullScheduleView apiUrl={apiUrl} onBack={forceToDashboard} canEdit={user.canEditSchedule} onAlert={showAlert} />;
-      case 'report-deficiency': return <DeficiencyReportForm user={user} apiUrl={apiUrl} onBack={forceToDashboard} onAlert={showAlert} />;
+      case 'report-deficiency': return <DeficiencyReportFormV2 user={user} apiUrl={apiUrl} onBack={forceToDashboard} onAlert={showAlert} />;
       case 'audit-records': return <AuditRecordsView user={user} apiUrl={apiUrl} onBack={forceToDashboard} />;
       case 'dashboard': default: return (
         <AssessmentPlaceholder
