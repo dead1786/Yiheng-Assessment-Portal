@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { User, AnyDeficiencyRecord } from '../types';
 import { fetchMyAuditRecords } from '../services/api';
 import { DeficiencyRecordList } from './DeficiencyRecordList';
 import { AuditStatsDashboard } from './AuditStatsDashboard';
-import { AlertTriangle, ArrowLeft, Loader2, X, ChevronRight, Cloud, BarChart3 } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Loader2, X, ChevronRight, BarChart3 } from 'lucide-react';
+import { useCloudSync } from '../services/useCloudSync';
+import { SyncStatus } from './SyncStatus';
 
 const SingleImage: React.FC<{ url: string; index: number }> = ({ url, index }) => {
   const [status, setStatus] = useState<'loading' | 'loaded' | 'error'>('loading');
@@ -55,34 +57,17 @@ interface AuditRecordsViewProps {
 export const AuditRecordsView: React.FC<AuditRecordsViewProps> = ({ user, apiUrl, onBack }) => {
   const cacheKey = `audit_records_${user.name}`;
 
-  const [records, setRecords] = useState<AnyDeficiencyRecord[]>(() => {
-    try { return JSON.parse(localStorage.getItem(cacheKey) || '[]'); } catch { return []; }
-  });
-  const [isLoading, setIsLoading] = useState(() => {
-    try { return JSON.parse(localStorage.getItem(cacheKey) || '[]').length === 0; } catch { return true; }
-  });
-  const [isSyncing, setIsSyncing] = useState(false);
+  const { data: records, isLoading, isSyncing, syncFailed, lastSyncedAt, refresh } = useCloudSync<AnyDeficiencyRecord[]>(
+    cacheKey,
+    async () => {
+      const res = await fetchMyAuditRecords(apiUrl, user.name);
+      return res.success ? res.records : null;
+    },
+    []
+  );
   const [selectedPerson, setSelectedPerson] = useState<{ name: string; records: AnyDeficiencyRecord[] } | null>(null);
   const [viewingPhotos, setViewingPhotos] = useState<string[] | null>(null);
   const [statsOpen, setStatsOpen] = useState(false);
-
-  useEffect(() => {
-    const hasCache = records.length > 0;
-    if (!hasCache) setIsLoading(true);
-    setIsSyncing(true);
-
-    fetchMyAuditRecords(apiUrl, user.name)
-      .then(res => {
-        if (res.success) {
-          setRecords(res.records);
-          localStorage.setItem(cacheKey, JSON.stringify(res.records));
-        }
-      })
-      .finally(() => {
-        setIsLoading(false);
-        setIsSyncing(false);
-      });
-  }, [apiUrl, user.name]);
 
   // 依被稽核者分組，按最新稽核日期排序
   const grouped = React.useMemo(() => {
@@ -128,12 +113,7 @@ export const AuditRecordsView: React.FC<AuditRecordsViewProps> = ({ user, apiUrl
     <div className="w-full max-w-6xl animate-in fade-in slide-in-from-bottom-4 duration-500">
 
       {/* 背景同步指示器 */}
-      {isSyncing && (
-        <div className="fixed bottom-8 right-8 z-50 bg-orange-100/90 border border-orange-200 text-orange-700 px-4 py-2 rounded-full shadow-xl flex items-center gap-2 animate-bounce pointer-events-none backdrop-blur-sm">
-          <Cloud size={16} />
-          <span className="text-xs font-bold">正在同步最新資料...</span>
-        </div>
-      )}
+      <SyncStatus isSyncing={isSyncing} syncFailed={syncFailed} lastSyncedAt={lastSyncedAt} onRetry={refresh} position="bottom-right" />
 
       <header className="flex items-center gap-4 mb-6">
         <button onClick={onBack} className="p-2 hover:bg-gray-100 rounded-full transition-colors">

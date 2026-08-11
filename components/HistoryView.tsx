@@ -1,7 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { User, AssessmentRecord } from '../types';
 import { fetchHistory } from '../services/api';
-import { ArrowLeft, Clock, Award, MessageSquare, Loader2, Cloud } from 'lucide-react';
+import { ArrowLeft, Clock, Award, MessageSquare, Loader2 } from 'lucide-react';
+import { useCloudSync } from '../services/useCloudSync';
+import { SyncStatus } from './SyncStatus';
 
 interface HistoryViewProps {
   user: User;
@@ -10,27 +12,14 @@ interface HistoryViewProps {
 }
 
 export const HistoryView: React.FC<HistoryViewProps> = ({ user, apiUrl, onBack }) => {
-  const [history, setHistory] = useState<AssessmentRecord[]>(() => {
-      try { return JSON.parse(localStorage.getItem(`cache_history_${user.name}`) || '[]'); } catch { return []; }
-  });
-
-  const [isLoading, setIsLoading] = useState(history.length === 0);
-  const [isSyncing, setIsSyncing] = useState(history.length > 0);
-
-  useEffect(() => {
-    const loadData = async () => {
-      if (history.length === 0) setIsLoading(true);
-      try {
-        const data = await fetchHistory(apiUrl, user.name);
-        if (data.success) {
-          setHistory(data.records);
-          localStorage.setItem(`cache_history_${user.name}`, JSON.stringify(data.records));
-        }
-      } catch (e) { console.error("Sync failed"); } 
-      finally { setIsLoading(false); setIsSyncing(false); }
-    };
-    loadData();
-  }, [apiUrl, user.name]);
+  const { data: history, isLoading, isSyncing, syncFailed, lastSyncedAt, refresh } = useCloudSync<AssessmentRecord[]>(
+    `cache_history_${user.name}`,
+    async () => {
+      const data = await fetchHistory(apiUrl, user.name);
+      return data.success ? data.records : null;
+    },
+    []
+  );
 
   // ✅ 統一日期格式: 2025/12/15 14:30:00 (含時間)
   const formatDateTime = (dateStr: string) => {
@@ -49,12 +38,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ user, apiUrl, onBack }
 
   return (
     <div className="w-full max-w-4xl animate-in fade-in slide-in-from-bottom-4 duration-500 relative">
-      {isSyncing && (
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-12 z-50 bg-orange-100/90 border border-orange-200 text-orange-700 px-4 py-2 rounded-full shadow-lg flex items-center gap-2 animate-pulse pointer-events-none backdrop-blur-sm">
-           <Cloud size={16} />
-           <span className="text-xs font-bold">正在同步最新紀錄...</span>
-        </div>
-      )}
+      <SyncStatus isSyncing={isSyncing} syncFailed={syncFailed} lastSyncedAt={lastSyncedAt} onRetry={refresh} syncingText="正在同步最新紀錄..." />
 
       <button onClick={onBack} className="mb-6 flex items-center text-gray-500 hover:text-gray-800 transition-colors">
         <ArrowLeft className="w-4 h-4 mr-1" /> 返回儀表板

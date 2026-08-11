@@ -94,13 +94,12 @@ export const DeficiencyReportFormV2: React.FC<DeficiencyReportFormProps> = ({ us
   const [showDefinitions, setShowDefinitions] = useState(false);
 
   useEffect(() => {
+    // 一律背景重抓最新名單/站點（畫面先顯示 localStorage 快取，抓到後覆蓋），避免卡舊資料
     const fetchData = async () => {
-        if (employees.length === 0) {
-            const empRes = await fetchEmployeeList(apiUrl);
-            if (empRes.success) {
-                setEmployees(empRes.employees);
-                localStorage.setItem('admin_employees', JSON.stringify(empRes.employees));
-            }
+        const empRes = await fetchEmployeeList(apiUrl);
+        if (empRes.success) {
+            setEmployees(empRes.employees);
+            localStorage.setItem('admin_employees', JSON.stringify(empRes.employees));
         }
         const stationRes = await fetchStationList(apiUrl);
         if (stationRes.success) {
@@ -113,7 +112,7 @@ export const DeficiencyReportFormV2: React.FC<DeficiencyReportFormProps> = ({ us
         }
     };
     fetchData();
-  }, [apiUrl, employees.length]);
+  }, [apiUrl]);
 
   useEffect(() => {
     if (formData.station.trim() && Object.keys(maintenanceMap).length > 0) {

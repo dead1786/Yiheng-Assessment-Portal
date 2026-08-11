@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { User, AssessmentRecord, Employee, AnyDeficiencyRecord, FullShift } from '../types';
 import { fetchAdminData, updateAdminPassword, submitAdminReview, fetchEmployeeList, updateEmployeeList, kickUser, fetchDeficiencyRecords, fetchShiftSchedule, fetchOfficeList } from '../services/api';
 import { LogOut, Users, Save, Loader2, RefreshCw, KeyRound, AlertTriangle, ChevronRight, Calendar, UserPlus, Trash2, Power, Settings, Cloud, X, Link, MapPin, Globe, Image as ImageIcon, MessageSquare, Star, ExternalLink, BarChart3 } from 'lucide-react';
 import { FullScheduleView } from './FullScheduleView';
 import { DeficiencyRecordList } from './DeficiencyRecordList';
 import { AuditStatsDashboard } from './AuditStatsDashboard';
+import { SyncStatus } from './SyncStatus';
 
 interface AdminDashboardProps {
   user: User;
@@ -89,7 +90,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
   const [adminReview, setAdminReview] = useState({ comment: '', score: '' });
   const [managingEmployee, setManagingEmployee] = useState<Employee | null>(null);
 
+  const [syncFailed, setSyncFailed] = useState(false);
+  const [lastSyncedAt, setLastSyncedAt] = useState<number | null>(() => {
+    const n = Number(localStorage.getItem('admin_data_syncedAt'));
+    return Number.isFinite(n) && n > 0 ? n : null;
+  });
+  const lastSyncedRef = useRef<number | null>(lastSyncedAt);
+  const syncingRef = useRef(false);
+
   const loadData = async (forceRefresh = false) => {
+    if (syncingRef.current) return;
+    syncingRef.current = true;
     if (forceRefresh) {
         setIsLoading(true);
         localStorage.removeItem('admin_records');
@@ -97,6 +108,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
         localStorage.removeItem('admin_deficiencies');
         localStorage.removeItem('admin_schedule');
     }
+    setIsSyncing(true);
 
     try {
       const data = await fetchAdminData(apiUrl);
@@ -107,18 +119,40 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
       if (defData.success) { setAllDeficiencies(defData.records); localStorage.setItem('admin_deficiencies', JSON.stringify(defData.records)); }
       const schedData = await fetchShiftSchedule<FullShift>(apiUrl);
       if (schedData.success) { localStorage.setItem('admin_schedule', JSON.stringify(schedData.shifts)); }
-      
+
       const officeRes = await fetchOfficeList(apiUrl);
       if (officeRes.success) {
           const stations = (officeRes as any).stations || (officeRes as any).offices || [];
           setAvailableOffices(stations);
       }
 
-    } catch (e) { console.error("Sync failed"); } 
-    finally { setIsLoading(false); setIsSyncing(false); }
+      // 三大核心資料任一同步失敗就標記，避免管理員看著舊資料不自知
+      const allOk = data.success && empData.success && defData.success;
+      setSyncFailed(!allOk);
+      if (allOk) {
+        const now = Date.now();
+        setLastSyncedAt(now);
+        lastSyncedRef.current = now;
+        localStorage.setItem('admin_data_syncedAt', String(now));
+      }
+    } catch (e) { console.error("Sync failed"); setSyncFailed(true); }
+    finally { syncingRef.current = false; setIsLoading(false); setIsSyncing(false); }
   };
 
   useEffect(() => { loadData(); }, [apiUrl]);
+
+  // App 切回前景時重新同步（60 秒節流），避免手機放背景後一直顯示舊資料
+  useEffect(() => {
+    const revalidate = () => {
+      if (document.visibilityState !== 'visible') return;
+      const last = lastSyncedRef.current;
+      if (last && Date.now() - last < 60_000) return;
+      loadData();
+    };
+    document.addEventListener('visibilitychange', revalidate);
+    return () => document.removeEventListener('visibilitychange', revalidate);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [apiUrl]);
 
   const handleEmployeeChange = (empName: string, field: keyof Employee, value: any) => {
     const newEmployees = employees.map(e => e.name === empName ? { ...e, [field]: value } : e);
@@ -247,12 +281,7 @@ const handleViewPhotos = (photoUrlString: string | undefined) => {
 
   return (
     <div className="w-full max-w-7xl animate-in fade-in duration-500 relative">
-      {isSyncing && (
-        <div className="fixed bottom-8 right-8 z-50 bg-orange-100/90 border border-orange-200 text-orange-700 px-4 py-2 rounded-full shadow-xl flex items-center gap-2 animate-bounce pointer-events-none backdrop-blur-sm">
-           <Cloud size={16} />
-           <span className="text-xs font-bold">正在同步最新資料...</span>
-        </div>
-      )}
+      <SyncStatus isSyncing={isSyncing} syncFailed={syncFailed} lastSyncedAt={lastSyncedAt} onRetry={() => loadData()} position="bottom-right" />
 
       <header className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
         <div><h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><Users className="text-blue-600" />管理員控制台</h1><p className="text-gray-500 mt-1">管理員：<span className="font-semibold">{user.name}</span></p></div>

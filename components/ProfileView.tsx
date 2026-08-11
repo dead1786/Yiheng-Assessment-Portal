@@ -1,9 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { User, AnyDeficiencyRecord } from '../types';
 import { fetchDeficiencyRecords } from '../services/api';
 import { DeficiencyRecordList } from './DeficiencyRecordList';
 import { AuditStatsDashboard } from './AuditStatsDashboard';
-import { ArrowLeft, User as UserIcon, AlertTriangle, Loader2, Award, Cloud, RefreshCw, Palmtree, X, BarChart3 } from 'lucide-react';
+import { ArrowLeft, User as UserIcon, AlertTriangle, Loader2, Award, RefreshCw, Palmtree, X, BarChart3 } from 'lucide-react';
+import { useCloudSync } from '../services/useCloudSync';
+import { SyncStatus } from './SyncStatus';
 
 interface ProfileViewProps {
   user: User;
@@ -74,51 +76,29 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ user, apiUrl, onBack, 
     return u.kpi || u.KPI || u.Kpi || u.score || u.Score || u.grade;
   });
 
-  const [deficiencies, setDeficiencies] = useState<AnyDeficiencyRecord[]>(() => {
-      try { return JSON.parse(localStorage.getItem(`cache_profile_${user.name}`) || '[]'); } catch { return []; }
-  });
-
-  const [isLoading, setIsLoading] = useState(deficiencies.length === 0);
-  const [isSyncing, setIsSyncing] = useState(deficiencies.length > 0);
+  const { data: deficiencies, isLoading, isSyncing, syncFailed, lastSyncedAt, refresh } = useCloudSync<AnyDeficiencyRecord[]>(
+    `cache_profile_${user.name}`,
+    async () => {
+      const data = await fetchDeficiencyRecords(apiUrl, user.name);
+      return data.success ? data.records : null;
+    },
+    []
+  );
   const [kpiLoading, setKpiLoading] = useState(false);
   const [viewingPhotos, setViewingPhotos] = useState<string[] | null>(null);
   const [statsOpen, setStatsOpen] = useState(false);
 
-  // 獨立的資料載入函式
-  const loadData = async (forceRefresh = false) => {
-    if (forceRefresh) {
-        setIsSyncing(true);
-        setKpiLoading(true);
-    } else {
-        if (deficiencies.length === 0) setIsLoading(true);
-        if (!kpiValue) setKpiLoading(true);
-    }
-
-    try {
-      const data = await fetchDeficiencyRecords(apiUrl, user.name);
-      
-      if (data.success) {
-        setDeficiencies(data.records);
-        localStorage.setItem(`cache_profile_${user.name}`, JSON.stringify(data.records));
-      }
-    } catch (e) { console.error("Sync failed"); } 
-    finally { 
-      setIsLoading(false); 
-      setIsSyncing(false);
-      setKpiLoading(false);
-    }
-  };
-
-  useEffect(() => { loadData(); }, [apiUrl, user.name]);
-
   // ✅ 處理手動刷新
   const handleManualRefresh = async () => {
-      setIsSyncing(true);
-      // 1. 呼叫上層 App 更新 User 資料 (特休/職等)
-      if (onRefresh) await onRefresh();
-      // 2. 更新本頁面的稽核紀錄
-      await loadData(true);
-      setIsSyncing(false);
+      setKpiLoading(true);
+      try {
+        // 1. 呼叫上層 App 更新 User 資料 (特休/職等)
+        if (onRefresh) await onRefresh();
+        // 2. 更新本頁面的稽核紀錄
+        await refresh();
+      } finally {
+        setKpiLoading(false);
+      }
   };
 
   const formatDate = (dateStr: string) => {
@@ -202,12 +182,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ user, apiUrl, onBack, 
 
   return (
     <div className="w-full max-w-5xl animate-in fade-in slide-in-from-bottom-4 duration-500 relative">
-      {isSyncing && (
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-12 z-50 bg-orange-100/90 border border-orange-200 text-orange-700 px-4 py-2 rounded-full shadow-lg flex items-center gap-2 animate-pulse pointer-events-none backdrop-blur-sm">
-           <Cloud size={16} />
-           <span className="text-xs font-bold">同步資料中...</span>
-        </div>
-      )}
+      <SyncStatus isSyncing={isSyncing} syncFailed={syncFailed} lastSyncedAt={lastSyncedAt} onRetry={refresh} syncingText="同步資料中..." />
 
       <div className="flex justify-between items-center mb-6">
           <button onClick={onBack} className="flex items-center text-gray-500 hover:text-gray-800 transition-colors">
