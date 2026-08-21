@@ -71,10 +71,13 @@ const ImagePreview: React.FC<{ url: string, index: number }> = ({ url, index }) 
 
 
 // ===== KPI 卡片共用邏輯 =====
-const KPI_BG = { red: 'bg-red-50 border-red-100', green: 'bg-green-50 border-green-100', blue: 'bg-blue-50 border-blue-100' };
-const KPI_TEXT = { red: 'text-red-900', green: 'text-green-900', blue: 'text-blue-900' };
-const KPI_ICON = { red: 'text-red-600', green: 'text-green-600', blue: 'text-blue-600' };
-const KPI_LABEL = { red: 'text-red-700', green: 'text-green-700', blue: 'text-blue-700' };
+type KpiColor = 'red' | 'green' | 'blue' | 'amber';
+
+const KPI_BG: Record<KpiColor, string> = { red: 'bg-red-50 border-red-100', green: 'bg-green-50 border-green-100', blue: 'bg-blue-50 border-blue-100', amber: 'bg-amber-50 border-amber-100' };
+const KPI_TEXT: Record<KpiColor, string> = { red: 'text-red-900', green: 'text-green-900', blue: 'text-blue-900', amber: 'text-amber-900' };
+const KPI_ICON: Record<KpiColor, string> = { red: 'text-red-600', green: 'text-green-600', blue: 'text-blue-600', amber: 'text-amber-600' };
+const KPI_LABEL: Record<KpiColor, string> = { red: 'text-red-700', green: 'text-green-700', blue: 'text-blue-700', amber: 'text-amber-700' };
+const KPI_BADGE: Record<KpiColor, string> = { red: 'bg-red-600 text-white', green: 'bg-green-600 text-white', blue: 'bg-blue-600 text-white', amber: 'bg-amber-500 text-white' };
 
 const parseKpi = (val: any) => {
   if (val === undefined || val === null || val === '') return NaN;
@@ -82,7 +85,7 @@ const parseKpi = (val: any) => {
   return Number(numStr);
 };
 
-const getKpiColor = (val: any): 'red' | 'green' | 'blue' => {
+const getKpiColor = (val: any): KpiColor => {
   const num = parseKpi(val);
   if (isNaN(num)) return 'blue';
   if (num < 80) return 'red';
@@ -90,20 +93,36 @@ const getKpiColor = (val: any): 'red' | 'green' | 'blue' => {
   return 'blue';
 };
 
+// 年度加權平均評分：>=95 A+ / >=90 A / >=80 B / >=70 C / >=60 D / 其餘 E
+const GRADE_RULE = 'A+ ≥95、A ≥90、B ≥80、C ≥70、D ≥60、其餘 E';
+
+const getGrade = (val: any): { label: string; color: KpiColor } | null => {
+  const num = parseKpi(val);
+  if (isNaN(num)) return null;
+  if (num >= 95) return { label: 'A+', color: 'green' };
+  if (num >= 90) return { label: 'A', color: 'green' };
+  if (num >= 80) return { label: 'B', color: 'blue' };
+  if (num >= 70) return { label: 'C', color: 'amber' };
+  if (num >= 60) return { label: 'D', color: 'red' };
+  return { label: 'E', color: 'red' };
+};
+
 interface KpiCardProps {
   label: string;
   hint?: string;                      // 例如「不含當周」
   value?: string | number;
   format?: 'percent' | 'number';      // percent：顯示 xx.xx%；number：純數字 xx.xx
+  showGrade?: boolean;                // 顯示 A+/A/B/C/D/E 評分徽章（卡片配色也跟著評分走）
   loading?: boolean;
 }
 
-const KpiCard: React.FC<KpiCardProps> = ({ label, hint, value, format = 'percent', loading }) => {
+const KpiCard: React.FC<KpiCardProps> = ({ label, hint, value, format = 'percent', showGrade, loading }) => {
   const raw = value === undefined || value === null ? '' : String(value).trim();
   const isEmpty = raw === '' || raw === '尚未設定' || raw === '-';
   const num = parseKpi(raw);
   const isNumeric = !isNaN(num);
-  const color = getKpiColor(isEmpty ? '' : raw);
+  const grade = showGrade && !isEmpty ? getGrade(raw) : null;
+  const color = grade ? grade.color : getKpiColor(isEmpty ? '' : raw);
 
   // 一律取到小數點第二位；百分比欄位補上 %
   const display = isEmpty
@@ -126,8 +145,16 @@ const KpiCard: React.FC<KpiCardProps> = ({ label, hint, value, format = 'percent
           {hint && <p className="text-[11px] text-gray-500 leading-tight mt-0.5">（{hint}）</p>}
         </div>
       </div>
-      <div className="flex items-baseline gap-1">
+      <div className="flex items-baseline gap-2">
         <p className={`${isNumeric ? 'text-2xl' : 'text-base'} font-bold ${KPI_TEXT[color]}`}>{display}</p>
+        {grade && (
+          <span
+            title={GRADE_RULE}
+            className={`px-2 py-0.5 rounded-md text-sm font-bold leading-none ${KPI_BADGE[grade.color]}`}
+          >
+            {grade.label}
+          </span>
+        )}
       </div>
     </div>
   );
@@ -242,7 +269,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ user, apiUrl, onBack, 
           <div className="p-4 bg-blue-50 rounded-xl border border-blue-100"><div className="flex items-center gap-2 mb-1"><Award className="w-4 h-4 text-blue-600" /><p className="text-sm text-blue-700 font-medium">職等</p></div><p className="text-lg font-bold text-blue-900">{user.jobGrade || '-'}</p></div>
         </div>
 
-        {/* ✅ KPI 區塊：年度KPI / 年度加權平均 / 當月KPI進度(不含當周) / 當周KPI進度 */}
+        {/* ✅ KPI 區塊：年度KPI(不含當月) / 年度加權平均(評分) / 當月KPI進度(不含當周) / 當周KPI進度 */}
         <div className="mt-6">
           <div className="flex items-center gap-2 mb-3">
             <Award className="w-4 h-4 text-gray-400" />
@@ -250,10 +277,10 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ user, apiUrl, onBack, 
             {kpiLoading && <RefreshCw className="w-3 h-3 animate-spin text-gray-400" />}
           </div>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <KpiCard label="年度KPI" value={user.kpi} format="percent" />
-            <KpiCard label="年度加權平均" value={user.kpiWeightedAvg} format="number" />
+            <KpiCard label="年度KPI" hint="不含當月" value={user.kpi} format="percent" />
+            <KpiCard label="年度加權平均" value={user.kpiWeightedAvg} format="number" showGrade />
             <KpiCard label="當月KPI進度" hint="不含當周" value={user.kpiMonth} format="percent" />
-            <KpiCard label="當周KPI進度" value={user.kpiWeek} format="percent" />
+            <KpiCard label="當周KPI進度" hint="不含當日，如大保養進度會延遲計算" value={user.kpiWeek} format="percent" />
           </div>
         </div>
 
