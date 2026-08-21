@@ -350,8 +350,17 @@ export const DeficiencyReportFormV2: React.FC<DeficiencyReportFormProps> = ({ us
 
         updateProgress();
         setProgress(100);
-        onAlert(result.message);
-        if (result.success) onBack();
+
+        if (result.success) {
+            onAlert(result.message || "稽核回報已成功送出！");
+            onBack();
+        } else if (result.unconfirmed) {
+            // 後端沒回傳確認訊息，但資料通常已寫入 → 不要顯示空白彈窗、也不要讓使用者重送
+            onAlert("已送出，但後端沒有回傳確認訊息。\n資料通常已經寫入，請到試算表確認該筆紀錄，\n確認前請勿重複送出。");
+            onBack();
+        } else {
+            onAlert(result.message || "送出失敗，請稍後再試");
+        }
 
     } catch (err) {
         onAlert("發生錯誤：" + (err instanceof Error ? err.message : "未知錯誤"));

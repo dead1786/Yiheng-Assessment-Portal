@@ -131,7 +131,7 @@ const App: React.FC = () => {
   useEffect(() => { viewRef.current = view; }, [view]);
   useEffect(() => { modalConfigRef.current = modalConfig; }, [modalConfig]);
 
-  const showAlert = useCallback((msg: string) => { return new Promise<void>((resolve) => { setModalConfig({ isOpen: true, type: 'alert', message: msg, onConfirm: () => { setModalConfig(prev => ({ ...prev, isOpen: false })); resolve(); } }); }); }, []);
+  const showAlert = useCallback((msg: string) => { const text = (msg === undefined || msg === null || String(msg).trim() === '') ? "⚠️ 後端沒有回傳訊息，請確認資料是否已寫入" : String(msg); return new Promise<void>((resolve) => { setModalConfig({ isOpen: true, type: 'alert', message: text, onConfirm: () => { setModalConfig(prev => ({ ...prev, isOpen: false })); resolve(); } }); }); }, []);
   const showConfirm = useCallback((msg: string, onYes: () => void, onNo?: () => void) => { 
       setModalConfig({ 
           isOpen: true, 

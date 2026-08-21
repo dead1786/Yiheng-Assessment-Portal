@@ -67,7 +67,20 @@ export const checkLoginStatus = async (apiUrl: string, name: string, sessionTime
     try { return await apiRequest(apiUrl, { action: 'checkLoginStatus', name, sessionTime }); } catch (error) { return { success: false, kicked: false }; } 
 };
 
-export const submitDeficiencyReport = async (apiUrl: string, data: DeficiencyReportData): Promise<{ success: boolean; message: string }> => { try { return await apiRequest(apiUrl, { action: 'submitDeficiencyReport', data }); } catch (error) { return { success: false, message: "連線失敗" }; } };
+// GAS 偶發：POST 被轉導後以 GET 打回 /exec，拿到 doGet 的 {status:"Running"}——
+// 這種回應沒有 success/message，但資料其實已經寫入。標記成 unconfirmed 交給呼叫端判斷，
+// 不能當成單純失敗（會害使用者重送而寫入兩筆）。
+export const submitDeficiencyReport = async (apiUrl: string, data: DeficiencyReportData): Promise<{ success: boolean; message: string; unconfirmed?: boolean }> => {
+  try {
+    const res = await apiRequest<any>(apiUrl, { action: 'submitDeficiencyReport', data });
+    if (res && typeof res.success === 'boolean') return res;
+    console.error('[submitDeficiencyReport] 後端回傳非預期格式:', res);
+    return { success: false, unconfirmed: true, message: "" };
+  } catch (error) {
+    console.error('[submitDeficiencyReport] 請求失敗:', error);
+    return { success: false, message: "連線失敗，請確認網路後再試" };
+  }
+};
 export const updateScheduleSource = async (apiUrl: string, data: UpdateScheduleRequest): Promise<{ success: boolean; message: string }> => { try { return await apiRequest(apiUrl, { action: 'updateScheduleSource', data }); } catch (error) { return { success: false, message: "連線失敗" }; } };
 
 export const uploadImage = async (apiUrl: string, file: File): Promise<{ success: boolean; fileUrl?: string; message: string }> => {
