@@ -78,7 +78,7 @@ const KPI_LABEL = { red: 'text-red-700', green: 'text-green-700', blue: 'text-bl
 
 const parseKpi = (val: any) => {
   if (val === undefined || val === null || val === '') return NaN;
-  const numStr = String(val).replace(/%|分|\s/g, '');
+  const numStr = String(val).replace(/%|分|,|\s/g, '');
   return Number(numStr);
 };
 
@@ -92,22 +92,25 @@ const getKpiColor = (val: any): 'red' | 'green' | 'blue' => {
 
 interface KpiCardProps {
   label: string;
-  hint?: string;      // 例如「不含當周」
+  hint?: string;                      // 例如「不含當周」
   value?: string | number;
-  unit?: string;      // 數值無單位時要補的單位（例如「分」）
+  format?: 'percent' | 'number';      // percent：顯示 xx.xx%；number：純數字 xx.xx
   loading?: boolean;
 }
 
-const KpiCard: React.FC<KpiCardProps> = ({ label, hint, value, unit, loading }) => {
+const KpiCard: React.FC<KpiCardProps> = ({ label, hint, value, format = 'percent', loading }) => {
   const raw = value === undefined || value === null ? '' : String(value).trim();
   const isEmpty = raw === '' || raw === '尚未設定' || raw === '-';
   const num = parseKpi(raw);
   const isNumeric = !isNaN(num);
   const color = getKpiColor(isEmpty ? '' : raw);
 
-  const display = isEmpty ? '--' : raw.replace(/分|\s/g, '');
-  const hasUnit = raw.includes('%') || raw.includes('分');
-  const showUnit = !isEmpty && isNumeric && !hasUnit && !!unit;
+  // 一律取到小數點第二位；百分比欄位補上 %
+  const display = isEmpty
+    ? '--'
+    : isNumeric
+      ? (format === 'percent' ? `${num.toFixed(2)}%` : num.toFixed(2))
+      : raw;
 
   return (
     <div className={`p-4 rounded-xl border flex flex-col min-h-[100px] justify-between ${KPI_BG[color]} relative`}>
@@ -125,7 +128,6 @@ const KpiCard: React.FC<KpiCardProps> = ({ label, hint, value, unit, loading }) 
       </div>
       <div className="flex items-baseline gap-1">
         <p className={`${isNumeric ? 'text-2xl' : 'text-base'} font-bold ${KPI_TEXT[color]}`}>{display}</p>
-        {showUnit && <span className="text-xs text-gray-500">{unit}</span>}
       </div>
     </div>
   );
@@ -248,10 +250,10 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ user, apiUrl, onBack, 
             {kpiLoading && <RefreshCw className="w-3 h-3 animate-spin text-gray-400" />}
           </div>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <KpiCard label="年度KPI" value={user.kpi} unit="分" />
-            <KpiCard label="年度加權平均" value={user.kpiWeightedAvg} unit="分" />
-            <KpiCard label="當月KPI進度" hint="不含當周" value={user.kpiMonth} />
-            <KpiCard label="當周KPI進度" value={user.kpiWeek} />
+            <KpiCard label="年度KPI" value={user.kpi} format="percent" />
+            <KpiCard label="年度加權平均" value={user.kpiWeightedAvg} format="number" />
+            <KpiCard label="當月KPI進度" hint="不含當周" value={user.kpiMonth} format="percent" />
+            <KpiCard label="當周KPI進度" value={user.kpiWeek} format="percent" />
           </div>
         </div>
 
