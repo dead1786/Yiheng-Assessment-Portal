@@ -46,10 +46,11 @@ export const fetchDeficiencyRecords = async (apiUrl: string, name?: string): Pro
 export const fetchShiftSchedule = async <T = any>(apiUrl: string, name?: string): Promise<ShiftScheduleResponse<T>> => { try { return await apiRequest(apiUrl, { action: 'getShiftSchedule', name: name || "" }); } catch (error) { return { success: false, shifts: [], message: "無法載入班表" }; } };
 export const kickUser = async (apiUrl: string, name: string): Promise<{ success: boolean; message: string }> => { try { return await apiRequest(apiUrl, { action: 'kickUser', name }); } catch (error) { return { success: false, message: "指令失敗" }; } };
 
-export const checkLoginStatus = async (apiUrl: string, name: string, sessionTime: number): Promise<{ 
-    success: boolean; 
-    kicked: boolean; 
-    message?: string; 
+export const checkLoginStatus = async (apiUrl: string, name: string, sessionTime: number): Promise<{
+    success: boolean;
+    kicked: boolean;
+    message?: string;
+    build?: string; 
     userDetails?: { 
         kpi?: string;
         kpiWeightedAvg?: string;

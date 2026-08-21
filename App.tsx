@@ -145,7 +145,7 @@ const App: React.FC = () => {
   useEffect(() => { const initApp = async () => { const savedApiUrl = localStorage.getItem('gas_api_url'); if (savedApiUrl) setApiUrl(savedApiUrl); }; initApp(); window.history.replaceState({ view: 'dashboard' }, ''); }, []);
   
   const performSync = useCallback(async () => {
-    if (!user || !apiUrl || user.isAdmin) return;
+    if (!user || !apiUrl) return;
     const savedSession = localStorage.getItem('app_session');
     if (!savedSession) return;
 
@@ -157,13 +157,13 @@ const App: React.FC = () => {
         const res = await checkLoginStatus(apiUrl, user.name, loginTime);
         const apiStatus = res.success ? "✅ 連線正常" : "❌ 連線失敗"; 
 
-        if (res.success && res.kicked) { 
+        if (res.success && res.kicked && !user.isAdmin) { 
             setDebugInfo(`${apiStatus}\n🔴 狀態: 已被踢出`); 
             showAlert("⚠️ 您的帳號已登出，請重新驗證。").then(() => handleLogout()); 
         } else { 
             if (!res.success && res.message && res.message.includes("Unknown")) setDebugInfo(`❌ GAS版本過舊`); 
             else {
-                setDebugInfo(`${apiStatus}\n🟢 狀態: 線上`); 
+                setDebugInfo(`${apiStatus}\n🟢 狀態: 線上\n🧩 後端: ${res.build || "舊版(未回報)"}`); 
                 if (res.userDetails) {
                     setUser(prev => {
                         if (!prev) return null;
