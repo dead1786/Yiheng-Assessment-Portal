@@ -3,7 +3,10 @@ export interface User {
   jobTitle: string;
   jobGrade: string;
   yearsOfService: string;
-  kpi: string;
+  kpi: string;             // I 欄：年度KPI
+  kpiWeightedAvg?: string; // AD 欄：年度加權平均
+  kpiMonth?: string;       // AE 欄：當月KPI進度（不含當周）
+  kpiWeek?: string;        // AF 欄：當周KPI進度
   joinDate: string;
   isAdmin: boolean;
   canAssess: boolean;
@@ -22,6 +25,9 @@ export interface Employee {
   jobGrade: string;
   jobGradeBonus: string;
   kpi: string;
+  kpiWeightedAvg?: string;
+  kpiMonth?: string;
+  kpiWeek?: string;
   salary: string;
   permission: boolean;
   color: string;
@@ -78,6 +84,9 @@ export interface AuthResponse {
     jobGrade: string;
     yearsOfService: string;
     kpi: string;
+    kpiWeightedAvg?: string;
+    kpiMonth?: string;
+    kpiWeek?: string;
     joinDate: string;
     canEditSchedule: boolean;
     annualLeave: string;      // ✅ 新增

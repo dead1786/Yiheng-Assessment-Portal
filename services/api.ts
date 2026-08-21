@@ -51,7 +51,10 @@ export const checkLoginStatus = async (apiUrl: string, name: string, sessionTime
     kicked: boolean; 
     message?: string; 
     userDetails?: { 
-        kpi?: string; 
+        kpi?: string;
+        kpiWeightedAvg?: string;
+        kpiMonth?: string;
+        kpiWeek?: string;
         jobGrade?: string; 
         annualLeave?: string; 
         annualLeaveUsed?: string; 

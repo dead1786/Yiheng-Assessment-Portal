@@ -70,11 +70,68 @@ const ImagePreview: React.FC<{ url: string, index: number }> = ({ url, index }) 
 };
 
 
+// ===== KPI 卡片共用邏輯 =====
+const KPI_BG = { red: 'bg-red-50 border-red-100', green: 'bg-green-50 border-green-100', blue: 'bg-blue-50 border-blue-100' };
+const KPI_TEXT = { red: 'text-red-900', green: 'text-green-900', blue: 'text-blue-900' };
+const KPI_ICON = { red: 'text-red-600', green: 'text-green-600', blue: 'text-blue-600' };
+const KPI_LABEL = { red: 'text-red-700', green: 'text-green-700', blue: 'text-blue-700' };
+
+const parseKpi = (val: any) => {
+  if (val === undefined || val === null || val === '') return NaN;
+  const numStr = String(val).replace(/%|分|\s/g, '');
+  return Number(numStr);
+};
+
+const getKpiColor = (val: any): 'red' | 'green' | 'blue' => {
+  const num = parseKpi(val);
+  if (isNaN(num)) return 'blue';
+  if (num < 80) return 'red';
+  if (num >= 90) return 'green';
+  return 'blue';
+};
+
+interface KpiCardProps {
+  label: string;
+  hint?: string;      // 例如「不含當周」
+  value?: string | number;
+  unit?: string;      // 數值無單位時要補的單位（例如「分」）
+  loading?: boolean;
+}
+
+const KpiCard: React.FC<KpiCardProps> = ({ label, hint, value, unit, loading }) => {
+  const raw = value === undefined || value === null ? '' : String(value).trim();
+  const isEmpty = raw === '' || raw === '尚未設定' || raw === '-';
+  const num = parseKpi(raw);
+  const isNumeric = !isNaN(num);
+  const color = getKpiColor(isEmpty ? '' : raw);
+
+  const display = isEmpty ? '--' : raw.replace(/分|\s/g, '');
+  const hasUnit = raw.includes('%') || raw.includes('分');
+  const showUnit = !isEmpty && isNumeric && !hasUnit && !!unit;
+
+  return (
+    <div className={`p-4 rounded-xl border flex flex-col min-h-[100px] justify-between ${KPI_BG[color]} relative`}>
+      {loading && (
+        <div className="absolute top-2 right-2">
+          <RefreshCw className="w-3 h-3 animate-spin text-gray-400" />
+        </div>
+      )}
+      <div className="flex items-start gap-2 mb-2">
+        <Award className={`w-4 h-4 mt-0.5 ${KPI_ICON[color]} flex-shrink-0`} />
+        <div className="min-w-0">
+          <p className={`text-sm font-medium leading-tight ${KPI_LABEL[color]}`}>{label}</p>
+          {hint && <p className="text-[11px] text-gray-500 leading-tight mt-0.5">（{hint}）</p>}
+        </div>
+      </div>
+      <div className="flex items-baseline gap-1">
+        <p className={`${isNumeric ? 'text-2xl' : 'text-base'} font-bold ${KPI_TEXT[color]}`}>{display}</p>
+        {showUnit && <span className="text-xs text-gray-500">{unit}</span>}
+      </div>
+    </div>
+  );
+};
+
 export const ProfileView: React.FC<ProfileViewProps> = ({ user, apiUrl, onBack, onRefresh }) => {
-  const [kpiValue, setKpiValue] = useState<string | number | undefined>(() => {
-    const u = user as any;
-    return u.kpi || u.KPI || u.Kpi || u.score || u.Score || u.grade;
-  });
 
   const { data: deficiencies, isLoading, isSyncing, syncFailed, lastSyncedAt, refresh } = useCloudSync<AnyDeficiencyRecord[]>(
     `cache_profile_${user.name}`,
@@ -112,39 +169,10 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ user, apiUrl, onBack, 
     } catch { return dateStr; }
   };
 
-  const parseKpi = (val: any) => {
-    if (val === undefined || val === null || val === '') return NaN;
-    const numStr = String(val).replace(/%|分|\s/g, '');
-    return Number(numStr);
-  };
-
-  const getKpiColor = (val: any) => {
-      const num = parseKpi(val);
-      if (isNaN(num)) return 'blue';
-      if (num < 80) return 'red';
-      if (num >= 90) return 'green';
-      return 'blue';
-  };
-
-  const kpiColor = getKpiColor(kpiValue);
-  
-  const rawKpiStr = String(kpiValue || '');
-  const isPercent = rawKpiStr.includes('%');
-  
-  let displayKpi = '--';
-  if (kpiValue !== undefined && kpiValue !== '') {
-      displayKpi = rawKpiStr.replace(/分|\s/g, '');
-  }
-
   // 計算剩餘特休 (會隨 user props 更新而即時變動)
   const totalLeave = parseFloat(user.annualLeave || '0');
   const usedLeave = parseFloat(user.annualLeaveUsed || '0');
   const remainingLeave = (totalLeave - usedLeave).toFixed(1).replace(/\.0$/, '');
-
-  const bgColors = { red: 'bg-red-50 border-red-100', green: 'bg-green-50 border-green-100', blue: 'bg-blue-50 border-blue-100' };
-  const textColors = { red: 'text-red-900', green: 'text-green-900', blue: 'text-blue-900' };
-  const iconColors = { red: 'text-red-600', green: 'text-green-600', blue: 'text-blue-600' };
-  const labelColors = { red: 'text-red-700', green: 'text-green-700', blue: 'text-blue-700' };
 
   // ✅ 修正：使用 Google 縮圖 API，解決破圖與變數拼接錯誤
   const getDirectImageUrl = (url: string) => {
@@ -206,27 +234,24 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ user, apiUrl, onBack, 
           <h2 className="text-2xl font-bold text-gray-900">個人檔案與資訊</h2>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="p-4 bg-gray-50 rounded-xl"><p className="text-sm text-gray-500 mb-1">姓名</p><p className="text-lg font-bold text-gray-800">{user.name}</p></div>
           <div className="p-4 bg-gray-50 rounded-xl"><p className="text-sm text-gray-500 mb-1">職稱 / 年資</p><p className="text-lg font-bold text-gray-800">{user.jobTitle ? user.jobTitle.split('||')[0].trim() : '-'} / {user.yearsOfService} 年</p></div>
           <div className="p-4 bg-blue-50 rounded-xl border border-blue-100"><div className="flex items-center gap-2 mb-1"><Award className="w-4 h-4 text-blue-600" /><p className="text-sm text-blue-700 font-medium">職等</p></div><p className="text-lg font-bold text-blue-900">{user.jobGrade || '-'}</p></div>
-          
-          <div className={`p-4 rounded-xl border flex flex-col min-h-[100px] ${bgColors[kpiColor as keyof typeof bgColors]} relative`}>
-            {kpiLoading && (
-               <div className="absolute top-2 right-2">
-                 <RefreshCw className="w-3 h-3 animate-spin text-gray-400" />
-               </div>
-            )}
-            <div className="flex items-center gap-2 mb-2">
-                <Award className={`w-4 h-4 ${iconColors[kpiColor as keyof typeof iconColors]} flex-shrink-0`} />
-                <p className={`text-sm font-medium ${labelColors[kpiColor as keyof typeof labelColors]}`}>年度KPI</p>
-            </div>
-            <div className="flex items-baseline gap-1">
-              <p className={`text-2xl font-bold ${textColors[kpiColor as keyof typeof textColors]}`}>
-                  {displayKpi}
-              </p>
-              {!isPercent && displayKpi !== '--' && <span className="text-xs text-gray-500">分</span>}
-            </div>
+        </div>
+
+        {/* ✅ KPI 區塊：年度KPI / 年度加權平均 / 當月KPI進度(不含當周) / 當周KPI進度 */}
+        <div className="mt-6">
+          <div className="flex items-center gap-2 mb-3">
+            <Award className="w-4 h-4 text-gray-400" />
+            <p className="text-sm font-bold text-gray-600">KPI 概況</p>
+            {kpiLoading && <RefreshCw className="w-3 h-3 animate-spin text-gray-400" />}
+          </div>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <KpiCard label="年度KPI" value={user.kpi} unit="分" />
+            <KpiCard label="年度加權平均" value={user.kpiWeightedAvg} unit="分" />
+            <KpiCard label="當月KPI進度" hint="不含當周" value={user.kpiMonth} />
+            <KpiCard label="當周KPI進度" value={user.kpiWeek} />
           </div>
         </div>
 

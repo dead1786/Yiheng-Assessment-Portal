@@ -169,6 +169,9 @@ const App: React.FC = () => {
                         if (!prev) return null;
                         if (
                             prev.kpi !== res.userDetails?.kpi ||
+                            prev.kpiWeightedAvg !== res.userDetails?.kpiWeightedAvg ||
+                            prev.kpiMonth !== res.userDetails?.kpiMonth ||
+                            prev.kpiWeek !== res.userDetails?.kpiWeek ||
                             prev.annualLeave !== res.userDetails?.annualLeave || 
                             prev.annualLeaveUsed !== res.userDetails?.annualLeaveUsed ||
                             prev.jobGrade !== res.userDetails?.jobGrade ||
@@ -179,6 +182,9 @@ const App: React.FC = () => {
                             const updatedUser = { 
                                 ...prev, 
                                 kpi: res.userDetails?.kpi || prev.kpi,
+                                kpiWeightedAvg: res.userDetails?.kpiWeightedAvg ?? "",
+                                kpiMonth: res.userDetails?.kpiMonth ?? "",
+                                kpiWeek: res.userDetails?.kpiWeek ?? "",
                                 jobGrade: res.userDetails?.jobGrade || prev.jobGrade,
                                 annualLeave: res.userDetails?.annualLeave || "0",
                                 annualLeaveUsed: res.userDetails?.annualLeaveUsed || "0",
@@ -269,7 +275,10 @@ const App: React.FC = () => {
           jobTitle: response.userDetails?.jobTitle || "", 
           jobGrade: response.userDetails?.jobGrade || "", 
           yearsOfService: response.userDetails?.yearsOfService || "", 
-          kpi: response.userDetails?.kpi || "", 
+          kpi: response.userDetails?.kpi || "",
+          kpiWeightedAvg: response.userDetails?.kpiWeightedAvg || "",
+          kpiMonth: response.userDetails?.kpiMonth || "",
+          kpiWeek: response.userDetails?.kpiWeek || "",
           joinDate: response.userDetails?.joinDate || "", 
           canEditSchedule: response.userDetails?.canEditSchedule || false,
           annualLeave: response.userDetails?.annualLeave || "0",
