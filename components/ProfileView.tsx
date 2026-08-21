@@ -142,7 +142,7 @@ const KpiCard: React.FC<KpiCardProps> = ({ label, hint, value, format = 'percent
         <Award className={`w-4 h-4 mt-0.5 ${KPI_ICON[color]} flex-shrink-0`} />
         <div className="min-w-0">
           <p className={`text-sm font-medium leading-tight ${KPI_LABEL[color]}`}>{label}</p>
-          {hint && <p className="text-[11px] text-gray-500 leading-tight mt-0.5">（{hint}）</p>}
+          {hint && <p className="text-[11px] text-gray-500 leading-tight mt-0.5 whitespace-pre-line">（{hint}）</p>}
         </div>
       </div>
       <div className="flex items-baseline gap-2">
@@ -257,16 +257,22 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ user, apiUrl, onBack, 
           </button>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 mb-8">
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 md:p-8 mb-8">
         <div className="flex items-center gap-3 mb-6">
           <UserIcon className="w-6 h-6 text-blue-600" />
           <h2 className="text-2xl font-bold text-gray-900">個人檔案與資訊</h2>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="p-4 bg-gray-50 rounded-xl"><p className="text-sm text-gray-500 mb-1">姓名</p><p className="text-lg font-bold text-gray-800">{user.name}</p></div>
-          <div className="p-4 bg-gray-50 rounded-xl"><p className="text-sm text-gray-500 mb-1">職稱 / 年資</p><p className="text-lg font-bold text-gray-800">{user.jobTitle ? user.jobTitle.split('||')[0].trim() : '-'} / {user.yearsOfService} 年</p></div>
-          <div className="p-4 bg-blue-50 rounded-xl border border-blue-100"><div className="flex items-center gap-2 mb-1"><Award className="w-4 h-4 text-blue-600" /><p className="text-sm text-blue-700 font-medium">職等</p></div><p className="text-lg font-bold text-blue-900">{user.jobGrade || '-'}</p></div>
+        {/* 基本資料：合併成一列，手機不再佔三塊 */}
+        <div className="p-4 bg-gray-50 rounded-xl flex flex-wrap items-center gap-x-3 gap-y-2">
+          <span className="text-xl font-bold text-gray-900">{user.name}</span>
+          <span className="text-gray-300 select-none">|</span>
+          <span className="text-sm text-gray-700">{user.jobTitle ? user.jobTitle.split('||')[0].trim() : '-'}</span>
+          <span className="text-gray-300 select-none">|</span>
+          <span className="text-sm text-gray-700">年資 {user.yearsOfService || '0'} 年</span>
+          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-blue-100 border border-blue-200 text-blue-800 text-xs font-bold">
+            <Award className="w-3 h-3" />職等 {user.jobGrade || '-'}
+          </span>
         </div>
 
         {/* ✅ KPI 區塊：年度KPI(不含當月) / 年度加權平均(評分) / 當月KPI進度(不含當周) / 當周KPI進度 */}
@@ -280,7 +286,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ user, apiUrl, onBack, 
             <KpiCard label="年度KPI" hint="不含當月" value={user.kpi} format="percent" />
             <KpiCard label="年度加權平均" value={user.kpiWeightedAvg} format="number" showGrade />
             <KpiCard label="當月KPI進度" hint="不含當周" value={user.kpiMonth} format="percent" />
-            <KpiCard label="當周KPI進度" hint="不含當日，如大保養進度會延遲計算" value={user.kpiWeek} format="percent" />
+            <KpiCard label="當周KPI進度" hint={'不含當日，\n如大保養進度會延遲計算'} value={user.kpiWeek} format="percent" />
           </div>
         </div>
 
