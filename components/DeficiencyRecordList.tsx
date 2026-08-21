@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { DeficiencyRecordV2, AnyDeficiencyRecord } from '../types';
 import { ChevronDown, Image as ImageIcon, ExternalLink, ShieldCheck } from 'lucide-react';
+import { buildTicketUrl, extractTicketNo } from '../services/ticketLink';
 
 export type { DeficiencyItemV2, DeficiencyRecordV2, DeficiencyRecordV1, AnyDeficiencyRecord } from '../types';
 
@@ -138,15 +139,15 @@ export const DeficiencyRecordList: React.FC<DeficiencyRecordListProps> = ({ reco
 
                 {/* 底部資訊列：工單 / 照片 / 稽核員 */}
                 <div className="flex items-center flex-wrap gap-3 mt-3 pt-3 border-t border-gray-200">
-                  {(v2 ? rec.ticketUrl : rec.ticketUrl) && (
+                  {(rec as any).ticketUrl && (
                     <a
-                      href={(rec as any).ticketUrl}
+                      href={buildTicketUrl((rec as any).ticketNo || (rec as any).ticketUrl)}
                       target="_blank"
                       rel="noopener noreferrer"
                       onClick={e => e.stopPropagation()}
                       className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 underline font-mono text-xs"
                     >
-                      {v2 && rec.ticketNo ? rec.ticketNo : (rec as any).ticketUrl.split('/').pop()}
+                      {extractTicketNo((rec as any).ticketNo || (rec as any).ticketUrl)}
                       <ExternalLink size={11} />
                     </a>
                   )}

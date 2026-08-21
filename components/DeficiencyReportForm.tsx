@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { User, Employee } from '../types';
 import { submitDeficiencyReport, fetchEmployeeList, fetchStationList, fetchMaintenanceInfo } from '../services/api';
+import { buildTicketUrl } from '../services/ticketLink';
 import { ArrowLeft, Send, Loader2, ClipboardCheck, Upload, Image as ImageIcon, Trash2, CheckCircle, AlertTriangle, ExternalLink, Calendar as CalendarIcon, X } from 'lucide-react';
 
 interface DeficiencyReportFormProps {
@@ -342,7 +343,7 @@ export const DeficiencyReportForm: React.FC<DeficiencyReportFormProps> = ({ user
                           <div className="flex items-center">
                             <ExternalLink size={14} className="mr-1.5 flex-shrink-0 text-blue-600" />
                             <a
-                              href={`https://prod-gnop-app.gogoro.com/ticket/report/detail/${maintenanceInfo.ticketId}`}
+                              href={buildTicketUrl(maintenanceInfo.ticketId)}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="text-blue-600 hover:text-blue-800 underline break-all"
@@ -372,7 +373,7 @@ export const DeficiencyReportForm: React.FC<DeficiencyReportFormProps> = ({ user
                 />
                 {formData.ticketNo && (
                   <a
-                    href={`https://prod-gnop.gogoro.com/ticket/management/search/detail/${formData.ticketNo}`}
+                    href={buildTicketUrl(formData.ticketNo)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="mt-1 inline-flex items-center text-xs text-blue-600 hover:text-blue-800 underline"
