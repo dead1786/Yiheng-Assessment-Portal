@@ -148,6 +148,27 @@ export const DeficiencyReportFormV2: React.FC<DeficiencyReportFormProps> = ({ us
     }
   };
 
+  // 文字欄位按 Enter（手機鍵盤「前往/完成」）不可直接送出表單——
+  // 否則站名只打到關鍵字就會被送出，產生「民生街」這種不完整的站名與照片資料夾
+  const preventEnterSubmit = (e: React.KeyboardEvent<HTMLFormElement>) => {
+    if (e.key !== 'Enter') return;
+    const el = e.target as HTMLInputElement;
+    if (el.tagName === 'INPUT' && el.type !== 'submit' && el.type !== 'button' && el.type !== 'file') {
+      e.preventDefault();
+    }
+  };
+
+  // 站名與站點清單的比對狀態：exact=清單內完整站名、partial=只是關鍵字（是某些站名的一部分）、none=清單未收錄
+  const stationInput = formData.station.trim();
+  const stationMatch = (() => {
+    if (!stationInput || stations.length === 0) return { kind: 'empty' as const, candidates: [] as string[] };
+    if (stations.includes(stationInput)) return { kind: 'exact' as const, candidates: [stationInput] };
+    const candidates = stations.filter(s => s.includes(stationInput));
+    return candidates.length > 0
+      ? { kind: 'partial' as const, candidates }
+      : { kind: 'none' as const, candidates: [] as string[] };
+  })();
+
   // 依稽核類型決定顯示的缺失項目
   const visibleItems = formData.auditType === '工單'
     ? DEFICIENCY_ITEMS.filter(item => TICKET_AUDIT_KEYS.includes(item.key))
@@ -259,7 +280,17 @@ export const DeficiencyReportFormV2: React.FC<DeficiencyReportFormProps> = ({ us
     const dupName = names.find((n, i) => names.indexOf(n) !== i);
     if (dupName) return onAlert(`員工「${dupName}」重複選取，請移除重複的欄位`);
 
-    if (!formData.station) return onAlert("請輸入交換站名稱");
+    if (!stationInput) return onAlert("請輸入交換站名稱");
+
+    // 站名只是關鍵字（清單中某些站名的一部分）→ 擋下，避免寫入不完整站名、建立多餘照片資料夾
+    if (stationMatch.kind === 'partial') {
+        if (stationMatch.candidates.length === 1) {
+            const full = stationMatch.candidates[0];
+            handleChange('station', full);
+            return onAlert(`站名「${stationInput}」不完整，已自動帶入完整站名：\n${full}\n請確認無誤後再按一次送出`);
+        }
+        return onAlert(`站名「${stationInput}」只是關鍵字，清單中有 ${stationMatch.candidates.length} 個相符站點，請從清單點選完整站名`);
+    }
     if (!hasDeficiency) return onAlert("請選擇「是否有缺失」");
 
     if (hasDeficiency === '有缺失') {
@@ -428,7 +459,7 @@ export const DeficiencyReportFormV2: React.FC<DeficiencyReportFormProps> = ({ us
              </div>
         </div>
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} onKeyDown={preventEnterSubmit}>
             <div className="mb-4">
                 <label className="block text-sm font-bold text-gray-700 mb-1">分區</label>
                 <select value={formData.zone} onChange={e => handleChange('zone', e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none bg-white">
@@ -483,6 +514,15 @@ export const DeficiencyReportFormV2: React.FC<DeficiencyReportFormProps> = ({ us
                     <label className="block text-sm font-bold text-gray-700 mb-1">交換站名稱</label>
                     <input type="text" list="station-list" value={formData.station} onChange={e => handleChange('station', e.target.value)} className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none" placeholder="輸入關鍵字搜尋..." />
                     <datalist id="station-list">{stations.map((s, i) => (<option key={i} value={s} />))}</datalist>
+                    {stationMatch.kind === 'partial' && (
+                      <p className="mt-1 text-xs text-amber-600 flex items-center">
+                        <AlertTriangle size={12} className="mr-1 flex-shrink-0" />
+                        這只是關鍵字，請從清單點選完整站名（符合 {stationMatch.candidates.length} 個）
+                      </p>
+                    )}
+                    {stationMatch.kind === 'none' && (
+                      <p className="mt-1 text-xs text-gray-400">此站名不在站點清單中，將以你輸入的文字寫入</p>
+                    )}
                     {maintenanceInfo && (
                       <div className="mt-2 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm space-y-1">
                         <div className="flex items-center text-amber-800">
