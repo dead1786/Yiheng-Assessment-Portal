@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { User, Employee } from '../types';
 import { submitDeficiencyReport, fetchEmployeeList, fetchStationList, fetchMaintenanceInfo } from '../services/api';
 import { buildTicketUrl } from '../services/ticketLink';
-import { ArrowLeft, Send, Loader2, ClipboardCheck, Upload, Image as ImageIcon, CheckCircle, AlertTriangle, ExternalLink, Calendar as CalendarIcon, X, ShieldCheck, ShieldAlert } from 'lucide-react';
+import { ArrowLeft, Send, Loader2, ClipboardCheck, Upload, Image as ImageIcon, CheckCircle, AlertTriangle, ExternalLink, Calendar as CalendarIcon, X, Plus, ShieldCheck, ShieldAlert } from 'lucide-react';
 
 interface DeficiencyReportFormProps {
   user: User;
@@ -64,9 +64,17 @@ const emptyDeficiencies = (): Record<DeficiencyKey, DeficiencyEntry> => {
 
 export const DeficiencyReportFormV2: React.FC<DeficiencyReportFormProps> = ({ user, apiUrl, onBack, onAlert }) => {
   const [formData, setFormData] = useState({
-    zone: '', targetName: '', station: '', date: new Date().toISOString().split('T')[0],
+    zone: '', station: '', date: new Date().toISOString().split('T')[0],
     auditType: '工單', ticketNo: ''
   });
+
+  // 被稽核員工：可多位，送出後每位各寫一列；至少保留一個欄位
+  const [targetNames, setTargetNames] = useState<string[]>(['']);
+  const updateTargetName = (idx: number, value: string) =>
+    setTargetNames(prev => prev.map((n, i) => (i === idx ? value : n)));
+  const addTargetName = () => setTargetNames(prev => [...prev, '']);
+  const removeTargetName = (idx: number) =>
+    setTargetNames(prev => (prev.length > 1 ? prev.filter((_, i) => i !== idx) : prev));
 
   // 是否有缺失：'' 未選 | '無缺失' | '有缺失'
   const [hasDeficiency, setHasDeficiency] = useState<'' | '無缺失' | '有缺失'>('');
@@ -241,7 +249,16 @@ export const DeficiencyReportFormV2: React.FC<DeficiencyReportFormProps> = ({ us
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.zone) return onAlert("請選擇分區");
-    if (!formData.targetName) return onAlert("請選擇員工");
+
+    // 員工檢查：每個欄位都要選、不可重複
+    const names = targetNames.map(n => n.trim());
+    const emptyIdx = names.findIndex(n => !n);
+    if (emptyIdx >= 0) {
+        return onAlert(names.length === 1 ? "請選擇員工" : `第 ${emptyIdx + 1} 位員工尚未選擇，請選擇或移除該欄位`);
+    }
+    const dupName = names.find((n, i) => names.indexOf(n) !== i);
+    if (dupName) return onAlert(`員工「${dupName}」重複選取，請移除重複的欄位`);
+
     if (!formData.station) return onAlert("請輸入交換站名稱");
     if (!hasDeficiency) return onAlert("請選擇「是否有缺失」");
 
@@ -343,6 +360,8 @@ export const DeficiencyReportFormV2: React.FC<DeficiencyReportFormProps> = ({ us
 
         const result = await submitDeficiencyReport(apiUrl, {
             ...formData,
+            targetName: names[0],
+            targetNames: names,
             hasDeficiency,
             deficiencies: deficiencyPayload,
             auditor: user.name,
@@ -418,11 +437,46 @@ export const DeficiencyReportFormV2: React.FC<DeficiencyReportFormProps> = ({ us
                 </select>
             </div>
             <div className="mb-4">
-                <label className="block text-sm font-bold text-gray-700 mb-1">被稽核員工 (姓名)</label>
-                <select value={formData.targetName} onChange={e => handleChange('targetName', e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none bg-white">
-                    <option value="">-- 請選擇員工 --</option>
-                    {employees.map((emp, i) => (<option key={i} value={emp.name}>{emp.name}</option>))}
-                </select>
+                <div className="flex items-center justify-between mb-1">
+                    <label className="block text-sm font-bold text-gray-700">
+                        被稽核員工 (姓名)
+                        {targetNames.length > 1 && (
+                          <span className="ml-2 text-xs text-gray-400 font-normal">共 {targetNames.length} 位，送出後每位各一筆</span>
+                        )}
+                    </label>
+                    <button
+                      type="button"
+                      onClick={addTargetName}
+                      className="inline-flex items-center text-xs font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded-lg transition-colors"
+                      title="新增一位被稽核員工"
+                    >
+                        <Plus size={14} className="mr-1" /> 新增員工
+                    </button>
+                </div>
+                <div className="space-y-2">
+                    {targetNames.map((name, idx) => (
+                      <div key={idx} className="flex gap-2">
+                        <select
+                          value={name}
+                          onChange={e => updateTargetName(idx, e.target.value)}
+                          className="flex-1 min-w-0 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none bg-white"
+                        >
+                            <option value="">{targetNames.length > 1 ? `-- 請選擇第 ${idx + 1} 位員工 --` : '-- 請選擇員工 --'}</option>
+                            {employees.map((emp, i) => (<option key={i} value={emp.name}>{emp.name}</option>))}
+                        </select>
+                        {targetNames.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => removeTargetName(idx)}
+                            className="w-12 flex-shrink-0 flex items-center justify-center border border-gray-300 rounded-lg text-gray-400 hover:text-red-600 hover:border-red-300 hover:bg-red-50 transition-colors"
+                            title="移除此員工"
+                          >
+                            <X size={18} />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="mb-4">

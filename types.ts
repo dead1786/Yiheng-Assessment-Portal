@@ -137,7 +137,8 @@ export interface ShiftScheduleResponse<T> {
 // 新版稽核回報送出格式（寫入「缺失紀錄表」）
 export interface DeficiencyReportData {
   zone: string;            // 分區 N1/N2/C1/C2/S1/S2
-  targetName: string;
+  targetName: string;      // 第一位被稽核員工（相容舊版）
+  targetNames?: string[];  // 全部被稽核員工，後端每位各寫一列
   station: string;
   date: string;
   auditType: string;       // 工單/月保養/半年保養/年度保養
