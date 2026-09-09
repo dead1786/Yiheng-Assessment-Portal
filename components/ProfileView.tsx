@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState } from 'react';
 import { User, AnyDeficiencyRecord } from '../types';
 import { fetchDeficiencyRecords } from '../services/api';
 import { DeficiencyRecordList } from './DeficiencyRecordList';
@@ -14,10 +14,8 @@ interface ProfileViewProps {
   onBack: () => void;
   // ✅ 新增：接收刷新函式
   onRefresh?: () => Promise<void>;
-  /** 稽核通知：進頁時的未讀紀錄鍵（用來標 NEW，整個停留期間都保留） */
+  /** 稽核通知：未讀紀錄鍵，只用來標 NEW；這頁不會標記已讀，已讀只由通知彈窗的「我知道了」決定 */
   unreadKeys?: Set<string>;
-  /** 稽核通知：清單顯示出來後回報，讓 App 把近期未讀標成已讀 */
-  onRecordsSeen?: (records: AnyDeficiencyRecord[]) => void;
 }
 
 // ✅ [修正] 圖片預覽元件 (終極防裁切版：強制完整顯示)
@@ -165,7 +163,7 @@ const KpiCard: React.FC<KpiCardProps> = ({ label, hint, value, format = 'percent
   );
 };
 
-export const ProfileView: React.FC<ProfileViewProps> = ({ user, apiUrl, onBack, onRefresh, unreadKeys, onRecordsSeen }) => {
+export const ProfileView: React.FC<ProfileViewProps> = ({ user, apiUrl, onBack, onRefresh, unreadKeys }) => {
 
   const { data: deficiencies, isLoading, isSyncing, syncFailed, lastSyncedAt, refresh } = useCloudSync<AnyDeficiencyRecord[]>(
     `cache_profile_${user.name}`,
@@ -177,17 +175,9 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ user, apiUrl, onBack, 
   );
   const [kpiLoading, setKpiLoading] = useState(false);
 
-  // 進頁當下的未讀集合快照：標記已讀後 NEW 徽章仍留著，直到離開這頁
-  const [newKeys] = useState<Set<string>>(() => new Set(unreadKeys ? Array.from(unreadKeys) : []));
+  // 稽核通知未讀鍵：只標 NEW，不在這頁標記已讀
+  const newKeys = unreadKeys ?? new Set<string>();
   const isNewRecord = newKeys.size > 0 ? (rec: AnyDeficiencyRecord) => newKeys.has(getRecordKey(rec)) : undefined;
-
-  // 清單顯示出來（含快取與背景同步後的新資料）就回報「已看到」
-  const onSeenRef = useRef(onRecordsSeen);
-  onSeenRef.current = onRecordsSeen;
-  useEffect(() => {
-    if (isLoading || deficiencies.length === 0) return;
-    onSeenRef.current?.(deficiencies);
-  }, [isLoading, deficiencies]);
   const [viewingPhotos, setViewingPhotos] = useState<string[] | null>(null);
   const [statsOpen, setStatsOpen] = useState(false);
 

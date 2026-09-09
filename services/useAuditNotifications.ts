@@ -16,9 +16,8 @@ export interface AuditNotifications {
   unreadKeys: Set<string>;
   isLoading: boolean;
   /**
-   * 標記已讀。傳入任意紀錄陣列，內部只會處理「近期且尚未已讀」的那些，
-   * 所以個人檔案頁可以直接把整份清單丟進來。
-   * source：寫回伺服器時的來源說明（彈窗確認／個人檔案檢視）
+   * 標記已讀。傳入任意紀錄陣列，內部只會處理「近期且尚未已讀」的那些。
+   * 目前只有通知彈窗的「我知道了」會呼叫（source = 彈窗確認）；打開個人檔案不算已讀。
    */
   markRead: (recs: AnyDeficiencyRecord[], source: string) => void;
   refresh: () => Promise<boolean>;

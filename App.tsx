@@ -225,9 +225,10 @@ const App: React.FC = () => {
     setNotifOpen(!isDismissed(notifName, unreadSignature(auditNotif.unread)));
   }, [notifName, view, auditNotif.unread]);
 
+  // 已讀只由「我知道了」決定；關閉視窗或前往個人檔案都只是本次啟動不再彈，下次開 App 會再提醒
   const handleNotifAcknowledge = () => { auditNotif.markRead(auditNotif.unread, '彈窗確認'); setNotifOpen(false); };
   const handleNotifLater = () => { if (notifName) setDismissed(notifName, unreadSignature(auditNotif.unread)); setNotifOpen(false); };
-  const handleNotifViewProfile = () => { setNotifOpen(false); setView('profile'); };
+  const handleNotifViewProfile = () => { handleNotifLater(); setView('profile'); };
 
   useEffect(() => {
     if (!user || !apiUrl || user.isAdmin) return;
@@ -331,7 +332,7 @@ const App: React.FC = () => {
     switch (view) {
       case 'form': return <AssessmentForm user={user} onBack={forceToDashboard} onSuccess={handleAssessmentSuccess} questions={questions} apiUrl={apiUrl} />;
       case 'history': return <HistoryView user={user} apiUrl={apiUrl} onBack={forceToDashboard} />;
-      case 'profile': return <ProfileView user={user} apiUrl={apiUrl} onBack={forceToDashboard} onRefresh={handleManualRefresh} unreadKeys={auditNotif.unreadKeys} onRecordsSeen={(recs) => auditNotif.markRead(recs, '個人檔案檢視')} />;
+      case 'profile': return <ProfileView user={user} apiUrl={apiUrl} onBack={forceToDashboard} onRefresh={handleManualRefresh} unreadKeys={auditNotif.unreadKeys} />;
       case 'schedule': return <ScheduleView user={user} apiUrl={apiUrl} onBack={forceToDashboard} />;
       case 'full-schedule': return <FullScheduleView apiUrl={apiUrl} onBack={forceToDashboard} canEdit={user.canEditSchedule} onAlert={showAlert} />;
       case 'report-deficiency': return <DeficiencyReportFormV2 user={user} apiUrl={apiUrl} onBack={forceToDashboard} onAlert={showAlert} />;
