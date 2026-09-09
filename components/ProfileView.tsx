@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { User, AnyDeficiencyRecord } from '../types';
 import { fetchDeficiencyRecords } from '../services/api';
 import { DeficiencyRecordList } from './DeficiencyRecordList';
@@ -6,13 +6,18 @@ import { AuditStatsDashboard } from './AuditStatsDashboard';
 import { ArrowLeft, User as UserIcon, AlertTriangle, Loader2, Award, RefreshCw, Palmtree, X, BarChart3 } from 'lucide-react';
 import { useCloudSync } from '../services/useCloudSync';
 import { SyncStatus } from './SyncStatus';
+import { getRecordKey } from '../services/auditNotify';
 
 interface ProfileViewProps {
   user: User;
   apiUrl: string;
   onBack: () => void;
   // ✅ 新增：接收刷新函式
-  onRefresh?: () => Promise<void>; 
+  onRefresh?: () => Promise<void>;
+  /** 稽核通知：進頁時的未讀紀錄鍵（用來標 NEW，整個停留期間都保留） */
+  unreadKeys?: Set<string>;
+  /** 稽核通知：清單顯示出來後回報，讓 App 把近期未讀標成已讀 */
+  onRecordsSeen?: (records: AnyDeficiencyRecord[]) => void;
 }
 
 // ✅ [修正] 圖片預覽元件 (終極防裁切版：強制完整顯示)
@@ -160,7 +165,7 @@ const KpiCard: React.FC<KpiCardProps> = ({ label, hint, value, format = 'percent
   );
 };
 
-export const ProfileView: React.FC<ProfileViewProps> = ({ user, apiUrl, onBack, onRefresh }) => {
+export const ProfileView: React.FC<ProfileViewProps> = ({ user, apiUrl, onBack, onRefresh, unreadKeys, onRecordsSeen }) => {
 
   const { data: deficiencies, isLoading, isSyncing, syncFailed, lastSyncedAt, refresh } = useCloudSync<AnyDeficiencyRecord[]>(
     `cache_profile_${user.name}`,
@@ -171,6 +176,18 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ user, apiUrl, onBack, 
     []
   );
   const [kpiLoading, setKpiLoading] = useState(false);
+
+  // 進頁當下的未讀集合快照：標記已讀後 NEW 徽章仍留著，直到離開這頁
+  const [newKeys] = useState<Set<string>>(() => new Set(unreadKeys ? Array.from(unreadKeys) : []));
+  const isNewRecord = newKeys.size > 0 ? (rec: AnyDeficiencyRecord) => newKeys.has(getRecordKey(rec)) : undefined;
+
+  // 清單顯示出來（含快取與背景同步後的新資料）就回報「已看到」
+  const onSeenRef = useRef(onRecordsSeen);
+  onSeenRef.current = onRecordsSeen;
+  useEffect(() => {
+    if (isLoading || deficiencies.length === 0) return;
+    onSeenRef.current?.(deficiencies);
+  }, [isLoading, deficiencies]);
   const [viewingPhotos, setViewingPhotos] = useState<string[] | null>(null);
   const [statsOpen, setStatsOpen] = useState(false);
 
@@ -314,6 +331,9 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ user, apiUrl, onBack, 
           <div className="flex items-center gap-3">
             <AlertTriangle className="w-6 h-6 text-red-500" />
             <h3 className="text-xl font-bold text-gray-900">稽核紀錄</h3>
+            {newKeys.size > 0 && (
+              <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-red-600 text-white">{newKeys.size} 筆新</span>
+            )}
             <button
               onClick={() => setStatsOpen(true)}
               className="ml-auto flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white text-xs font-bold rounded-lg hover:bg-blue-700 shadow-sm transition-all active:scale-95"
@@ -335,6 +355,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ user, apiUrl, onBack, 
               showAuditor={false}
               showName={false}
               onViewPhotos={handleViewPhotos}
+              isNew={isNewRecord}
             />
           </div>
         )}

@@ -21,10 +21,14 @@ interface DeficiencyRecordListProps {
   showAuditor?: boolean;   // 是否顯示稽核員欄（個人視角不需要）
   showName?: boolean;      // 是否顯示被稽核員工姓名（依人分組的視角不需要）
   onViewPhotos?: (photoUrlString: string) => void;
+  /** 回傳 true 的紀錄會標「NEW」（稽核通知未讀） */
+  isNew?: (rec: AnyDeficiencyRecord) => boolean;
+  /** 預設展開第幾筆（依日期新→舊排序後的索引；通知彈窗用 0 讓最新一筆直接攤開） */
+  defaultExpandedIndex?: number | null;
 }
 
-export const DeficiencyRecordList: React.FC<DeficiencyRecordListProps> = ({ records, showAuditor = true, showName = false, onViewPhotos }) => {
-  const [expanded, setExpanded] = useState<number | null>(null);
+export const DeficiencyRecordList: React.FC<DeficiencyRecordListProps> = ({ records, showAuditor = true, showName = false, onViewPhotos, isNew, defaultExpandedIndex = null }) => {
+  const [expanded, setExpanded] = useState<number | null>(defaultExpandedIndex);
 
   const sorted = [...records].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
@@ -54,6 +58,9 @@ export const DeficiencyRecordList: React.FC<DeficiencyRecordListProps> = ({ reco
                 <div className="min-w-0 flex-1">
                   {/* 第一列：日期 + 徽章群 */}
                   <div className="flex items-center flex-wrap gap-2 mb-1.5">
+                    {isNew?.(rec) && (
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-red-600 text-white leading-none">NEW</span>
+                    )}
                     <span className="font-mono text-xs text-gray-500">{formatDate(rec.date)}</span>
                     {v2 ? (
                       <>

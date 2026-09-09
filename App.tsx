@@ -9,9 +9,12 @@ import { ScheduleView } from './components/ScheduleView';
 import { FullScheduleView } from './components/FullScheduleView';
 import { DeficiencyReportFormV2 } from './components/DeficiencyReportFormV2';
 import { AuditRecordsView } from './components/AuditRecordsView';
+import { AuditNotificationModal } from './components/AuditNotificationModal';
 // ✅ 新增引用外部 ErrorBoundary
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { authenticateEmployee, checkLoginStatus, fetchMyAuditRecords, changePassword } from './services/api';
+import { useAuditNotifications } from './services/useAuditNotifications';
+import { unreadSignature, isDismissed, setDismissed, clearDismissed } from './services/auditNotify';
 import { User } from './types';
 import { AlertTriangle, Cloud, Lock, Loader2, Eye, EyeOff } from 'lucide-react';
 
@@ -124,6 +127,11 @@ const App: React.FC = () => {
   const [modalConfig, setModalConfig] = useState<{ isOpen: boolean; type: 'alert' | 'confirm'; message: string; onConfirm: () => void; onCancel?: () => void; }>({ isOpen: false, type: 'alert', message: '', onConfirm: () => {} });
   const [showChangePassword, setShowChangePassword] = useState(false);
 
+  // 稽核通知：整個 App 只有一份狀態，儀表板徽章／彈窗／個人檔案 NEW 標記都吃這裡（管理員不會被稽核，不啟用）
+  const notifName = user && !user.isAdmin ? user.name : null;
+  const auditNotif = useAuditNotifications(notifName, apiUrl);
+  const [notifOpen, setNotifOpen] = useState(false);
+
   const isPopping = useRef(false);
   const viewRef = useRef(view);
   const modalConfigRef = useRef(modalConfig);
@@ -206,9 +214,20 @@ const App: React.FC = () => {
 
   const handleManualRefresh = async () => {
       setIsSyncing(true);
-      await performSync();
+      await Promise.all([performSync(), auditNotif.refresh()]);
       setTimeout(() => setIsSyncing(false), 800);
   };
+
+  // 彈窗時機：在儀表板、有近期未讀、且本次啟動沒對「同一批」按過稍後再看。
+  // 按「我知道了」→ unread 變空自動關；有新紀錄進來 → 簽章改變會再彈。
+  useEffect(() => {
+    if (!notifName || view !== 'dashboard' || auditNotif.unread.length === 0) { setNotifOpen(false); return; }
+    setNotifOpen(!isDismissed(notifName, unreadSignature(auditNotif.unread)));
+  }, [notifName, view, auditNotif.unread]);
+
+  const handleNotifAcknowledge = () => { auditNotif.markRead(auditNotif.unread, '彈窗確認'); setNotifOpen(false); };
+  const handleNotifLater = () => { if (notifName) setDismissed(notifName, unreadSignature(auditNotif.unread)); setNotifOpen(false); };
+  const handleNotifViewProfile = () => { setNotifOpen(false); setView('profile'); };
 
   useEffect(() => {
     if (!user || !apiUrl || user.isAdmin) return;
@@ -288,6 +307,7 @@ const App: React.FC = () => {
         };
         
         const qs = response.questions && response.questions.length > 0 ? response.questions : ["..."];
+        clearDismissed(name); // 重新登入視為新的一次啟動，稽核通知要再提醒
         setUser(userData); setQuestions(qs);
         const now = Date.now(); const expiryTime = now + (15 * 24 * 60 * 60 * 1000);
         localStorage.setItem('app_session', JSON.stringify({ user: userData, questions: qs, expiry: expiryTime, loginTime: now }));
@@ -311,7 +331,7 @@ const App: React.FC = () => {
     switch (view) {
       case 'form': return <AssessmentForm user={user} onBack={forceToDashboard} onSuccess={handleAssessmentSuccess} questions={questions} apiUrl={apiUrl} />;
       case 'history': return <HistoryView user={user} apiUrl={apiUrl} onBack={forceToDashboard} />;
-      case 'profile': return <ProfileView user={user} apiUrl={apiUrl} onBack={forceToDashboard} onRefresh={handleManualRefresh} />;
+      case 'profile': return <ProfileView user={user} apiUrl={apiUrl} onBack={forceToDashboard} onRefresh={handleManualRefresh} unreadKeys={auditNotif.unreadKeys} onRecordsSeen={(recs) => auditNotif.markRead(recs, '個人檔案檢視')} />;
       case 'schedule': return <ScheduleView user={user} apiUrl={apiUrl} onBack={forceToDashboard} />;
       case 'full-schedule': return <FullScheduleView apiUrl={apiUrl} onBack={forceToDashboard} canEdit={user.canEditSchedule} onAlert={showAlert} />;
       case 'report-deficiency': return <DeficiencyReportFormV2 user={user} apiUrl={apiUrl} onBack={forceToDashboard} onAlert={showAlert} />;
@@ -328,6 +348,7 @@ const App: React.FC = () => {
             onReportDeficiency={() => setView('report-deficiency')}
             onViewAuditRecords={() => setView('audit-records')}
             onChangePassword={() => setShowChangePassword(true)}
+            unreadAuditCount={auditNotif.unread.length}
         />
       );
     }
@@ -342,6 +363,15 @@ const App: React.FC = () => {
            <Cloud size={16} />
            <span className="text-xs font-bold">同步資料中...</span>
         </div>
+      )}
+      {notifName && (
+        <AuditNotificationModal
+          isOpen={notifOpen}
+          records={auditNotif.unread}
+          onAcknowledge={handleNotifAcknowledge}
+          onLater={handleNotifLater}
+          onViewProfile={handleNotifViewProfile}
+        />
       )}
       <ModalDialog isOpen={modalConfig.isOpen} type={modalConfig.type} message={modalConfig.message} onConfirm={modalConfig.onConfirm} onCancel={modalConfig.onCancel} />
       {user && !user.isAdmin && <ChangePasswordModal isOpen={showChangePassword} userName={user.name} apiUrl={apiUrl} onClose={() => setShowChangePassword(false)} onAlert={showAlert} />}

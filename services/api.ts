@@ -37,10 +37,26 @@ export const submitAdminReview = async (apiUrl: string, rowIndex: number, adminC
 export const fetchEmployeeList = async (apiUrl: string): Promise<EmployeeListResponse> => { try { return await apiRequest(apiUrl, { action: 'getEmployeeList' }); } catch (error) { return { success: false, employees: [], message: "無法載入名單" }; } };
 export const updateEmployeeList = async (apiUrl: string, employees: Employee[]): Promise<{ success: boolean; message: string }> => { try { return await apiRequest(apiUrl, { action: 'updateEmployeeList', employees }); } catch (error) { return { success: false, message: "更新失敗" }; } };
 
-export const fetchDeficiencyRecords = async (apiUrl: string, name?: string): Promise<{ success: boolean; records: AnyDeficiencyRecord[]; message?: string }> => {
+// readKeys：該員工已在伺服器標記已讀的稽核紀錄鍵（舊版 GAS 沒有這個欄位，前端會退回只用本機已讀）
+export const fetchDeficiencyRecords = async (apiUrl: string, name?: string): Promise<{ success: boolean; records: AnyDeficiencyRecord[]; readKeys?: string[]; message?: string }> => {
   try {
     return await apiRequest(apiUrl, { action: 'getDeficiencyRecords', name: name || "" });
   } catch (error) { return { success: false, records: [], message: "無法載入稽核紀錄" }; }
+};
+
+// 稽核通知已讀回寫：items 為前端算好的紀錄鍵與摘要欄位，GAS 只負責存（鍵對後端是不透明字串）
+export const markAuditRead = async (
+  apiUrl: string,
+  name: string,
+  items: { key: string; date: string; station: string; auditType: string; auditor: string; source: string }[]
+): Promise<{ success: boolean; added?: number; message?: string; unsupported?: boolean }> => {
+  try {
+    const res = await apiRequest<any>(apiUrl, { action: 'markAuditRead', name, items });
+    if (res && res.success === false && typeof res.message === 'string' && res.message.includes('Unknown Action')) {
+      return { success: false, unsupported: true, message: res.message };
+    }
+    return res;
+  } catch (error) { return { success: false, message: "連線失敗" }; }
 };
 
 export const fetchShiftSchedule = async <T = any>(apiUrl: string, name?: string): Promise<ShiftScheduleResponse<T>> => { try { return await apiRequest(apiUrl, { action: 'getShiftSchedule', name: name || "" }); } catch (error) { return { success: false, shifts: [], message: "無法載入班表" }; } };

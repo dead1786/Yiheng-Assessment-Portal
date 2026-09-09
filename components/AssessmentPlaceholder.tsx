@@ -1,6 +1,6 @@
 import React from 'react';
 import { User } from '../types';
-import { LogOut, ClipboardList, CheckCircle2, UserCircle, Lock, Calendar, LayoutGrid, Navigation, Wrench, AlertTriangle } from 'lucide-react';
+import { LogOut, ClipboardList, CheckCircle2, UserCircle, Lock, Calendar, LayoutGrid, Navigation, Wrench, AlertTriangle, BellRing } from 'lucide-react';
 
 interface AssessmentPlaceholderProps {
   user: User;
@@ -13,6 +13,8 @@ interface AssessmentPlaceholderProps {
   onReportDeficiency: () => void;
   onViewAuditRecords: () => void;
   onChangePassword: () => void;
+  /** 近期未讀的被稽核紀錄數，>0 時在「個人檔案」卡片顯示徽章 */
+  unreadAuditCount?: number;
 }
 
 export const AssessmentPlaceholder: React.FC<AssessmentPlaceholderProps> = ({
@@ -25,7 +27,8 @@ export const AssessmentPlaceholder: React.FC<AssessmentPlaceholderProps> = ({
   onViewFullSchedule,
   onReportDeficiency,
   onViewAuditRecords,
-  onChangePassword
+  onChangePassword,
+  unreadAuditCount = 0
 }) => {
   
   const isLeader = (title?: string) => {
@@ -56,12 +59,17 @@ export const AssessmentPlaceholder: React.FC<AssessmentPlaceholderProps> = ({
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6"> 
         
         {/* 卡片 1: 個人檔案 */}
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center text-center hover:shadow-md transition-shadow group">
+        <div className={`bg-white p-6 rounded-2xl shadow-sm border flex flex-col items-center text-center hover:shadow-md transition-shadow group relative ${unreadAuditCount > 0 ? 'border-red-200 ring-2 ring-red-100' : 'border-gray-100'}`}>
+          {unreadAuditCount > 0 && (
+            <span className="absolute top-3 right-3 inline-flex items-center gap-1 px-2 py-1 rounded-full bg-red-600 text-white text-[11px] font-bold shadow-md animate-in zoom-in duration-300">
+              <BellRing size={12} /> {unreadAuditCount} 筆新稽核
+            </span>
+          )}
           <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mb-4 text-purple-600 group-hover:scale-110 transition-transform">
             <UserCircle size={32} />
           </div>
           <h3 className="text-xl font-bold text-gray-800 mb-2">個人檔案</h3>
-          <p className="text-gray-500 mb-6 text-sm">檢視 KPI、年資與稽核狀況。</p>
+          <p className="text-gray-500 mb-6 text-sm">{unreadAuditCount > 0 ? '您有新的稽核紀錄，點擊查看詳情。' : '檢視 KPI、年資與稽核狀況。'}</p>
           <button onClick={onViewProfile} className="mt-auto w-full py-2.5 px-4 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium transition-colors">
             查看檔案
           </button>
