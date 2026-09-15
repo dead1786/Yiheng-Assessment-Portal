@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { DeficiencyRecordV2, AnyDeficiencyRecord } from '../types';
-import { ChevronDown, Image as ImageIcon, ExternalLink, ShieldCheck } from 'lucide-react';
+import { ChevronDown, Image as ImageIcon, ExternalLink, ShieldCheck, FileText, FolderOpen, Paperclip } from 'lucide-react';
 import { buildTicketUrl, extractTicketNo } from '../services/ticketLink';
+import { classifyAttachments, groupAttachments, EMPTY_GROUP } from '../services/attachments';
+import { usePdfIndex } from '../services/pdfIndex';
 
 export type { DeficiencyItemV2, DeficiencyRecordV2, DeficiencyRecordV1, AnyDeficiencyRecord } from '../types';
 
@@ -29,6 +31,8 @@ interface DeficiencyRecordListProps {
 
 export const DeficiencyRecordList: React.FC<DeficiencyRecordListProps> = ({ records, showAuditor = true, showName = false, onViewPhotos, isNew, defaultExpandedIndex = null }) => {
   const [expanded, setExpanded] = useState<number | null>(defaultExpandedIndex);
+  // 稽核 PDF 資料夾清單：判斷 Z 欄每個項目是照片還是 PDF（清單還沒到時 Drive 連結先當照片）
+  const pdfIndex = usePdfIndex();
 
   const sorted = [...records].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
@@ -45,6 +49,8 @@ export const DeficiencyRecordList: React.FC<DeficiencyRecordListProps> = ({ reco
         const isOpen = expanded === i;
         const totalCount = v2 ? rec.items.reduce((s, it) => s + (parseInt(it.count) || 0), 0) : null;
         const noDeficiency = v2 && rec.items.length === 0;
+        // Z 欄：照片 / PDF / 資料夾 / 純文字，同一格用逗號、直線或換行分隔（只在展開時解析）
+        const { images, pdfs, folders, texts } = isOpen ? groupAttachments(classifyAttachments(rec.photoUrl, pdfIndex)) : EMPTY_GROUP;
 
         return (
           <div key={i} className={`border rounded-xl overflow-hidden transition-all ${noDeficiency ? 'border-green-200 bg-green-50/40' : 'border-gray-200 bg-white'}`}>
@@ -144,7 +150,7 @@ export const DeficiencyRecordList: React.FC<DeficiencyRecordListProps> = ({ reco
                   </div>
                 )}
 
-                {/* 底部資訊列：工單 / 照片 / 稽核員 */}
+                {/* 底部資訊列：工單 / 照片 / PDF / 稽核員 */}
                 <div className="flex items-center flex-wrap gap-3 mt-3 pt-3 border-t border-gray-200">
                   {(rec as any).ticketUrl && (
                     <a
@@ -158,15 +164,54 @@ export const DeficiencyRecordList: React.FC<DeficiencyRecordListProps> = ({ reco
                       <ExternalLink size={11} />
                     </a>
                   )}
-                  {rec.photoUrl && (
+                  {images.length > 0 && (
                     <button
                       type="button"
-                      onClick={(e) => { e.stopPropagation(); onViewPhotos?.(rec.photoUrl!); }}
+                      onClick={(e) => { e.stopPropagation(); onViewPhotos?.(images.join('\n')); }}
                       className="inline-flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors text-xs font-bold"
                     >
-                      <ImageIcon size={13} /> 查看照片
+                      <ImageIcon size={13} /> 查看照片{images.length > 1 ? ` (${images.length})` : ''}
                     </button>
                   )}
+                  {/* PDF 不做預覽，直接開新分頁（Drive 檢視器） */}
+                  {pdfs.map((p, k) => (
+                    <a
+                      key={`pdf-${k}`}
+                      href={p.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={e => e.stopPropagation()}
+                      title={`開啟 PDF：${p.name}`}
+                      className="inline-flex items-center gap-1 px-2 py-1 bg-red-50 text-red-700 rounded-lg hover:bg-red-100 transition-colors text-xs font-bold max-w-full"
+                    >
+                      <FileText size={13} className="flex-shrink-0" />
+                      <span className="truncate max-w-[200px]">{p.name}</span>
+                      <ExternalLink size={11} className="flex-shrink-0" />
+                    </a>
+                  ))}
+                  {folders.map((url, k) => (
+                    <a
+                      key={`folder-${k}`}
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={e => e.stopPropagation()}
+                      className="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-xs font-bold"
+                    >
+                      <FolderOpen size={13} /> 開啟資料夾 <ExternalLink size={11} />
+                    </a>
+                  ))}
+                  {/* Z 欄純文字但對不到 PDF 檔：照樣顯示，讓人知道有附件備註 */}
+                  {texts.map((text, k) => (
+                    <span
+                      key={`text-${k}`}
+                      title="附件欄的文字，找不到對應的 PDF 檔案"
+                      className="inline-flex items-center gap-1 px-2 py-1 bg-gray-50 text-gray-400 border border-dashed border-gray-300 rounded-lg text-xs max-w-full"
+                    >
+                      <Paperclip size={12} className="flex-shrink-0" />
+                      <span className="truncate max-w-[200px]">{text}</span>
+                    </span>
+                  ))}
                   {showAuditor && rec.auditor && (
                     <span className="text-xs text-gray-400 ml-auto">稽核員：{rec.auditor}</span>
                   )}

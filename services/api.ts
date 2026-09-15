@@ -3,6 +3,7 @@ import {
   DeficiencyRecord, AnyDeficiencyRecord, Shift, FullShift, ShiftScheduleResponse, DeficiencyReportData,
   UpdateScheduleRequest, User, ClockInData, ClockInResponse
 } from '../types';
+import type { PdfIndexFile } from './attachments';
 
 async function apiRequest<T>(apiUrl: string, payload: any): Promise<T> {
     if (!apiUrl) throw new Error("API URL 未設定");
@@ -208,6 +209,11 @@ export const submitClockIn = async (apiUrl: string, data: ClockInData): Promise<
       message: error instanceof Error ? error.message : "打卡連線失敗"
     };
   }
+};
+
+/** 稽核 PDF 資料夾清單（判斷 Z 欄的 Drive 連結是照片還是 PDF、把純文字關鍵字對到檔案） */
+export const fetchAuditPdfIndex = async (apiUrl: string): Promise<{ success: boolean; files: PdfIndexFile[]; message?: string }> => {
+  try { return await apiRequest(apiUrl, { action: 'getAuditPdfIndex' }); } catch (error) { return { success: false, files: [], message: '無法載入 PDF 清單' }; }
 };
 
 export const fetchMyAuditRecords = async (apiUrl: string, name: string): Promise<{ success: boolean; records: AnyDeficiencyRecord[]; message?: string }> => {

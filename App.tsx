@@ -14,6 +14,7 @@ import { AuditNotificationModal } from './components/AuditNotificationModal';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { authenticateEmployee, checkLoginStatus, fetchMyAuditRecords, changePassword } from './services/api';
 import { useAuditNotifications } from './services/useAuditNotifications';
+import { ensurePdfIndex } from './services/pdfIndex';
 import { unreadSignature, isDismissed, setDismissed, clearDismissed } from './services/auditNotify';
 import { User } from './types';
 import { AlertTriangle, Cloud, Lock, Loader2, Eye, EyeOff } from 'lucide-react';
@@ -244,6 +245,9 @@ const App: React.FC = () => {
       .then(res => { if (res.success) localStorage.setItem(`audit_records_${preloadName}`, JSON.stringify(res.records)); })
       .catch(() => {});
   }, [preloadName, apiUrl]);
+
+  // 預先抓稽核 PDF 資料夾清單（判斷稽核紀錄 Z 欄的連結是照片還是 PDF）
+  useEffect(() => { if (user && apiUrl) ensurePdfIndex(apiUrl); }, [user, apiUrl]);
 
   useEffect(() => { 
       const handlePopState = (event: PopStateEvent) => { 

@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import { DeficiencyReportFormV2 } from './components/DeficiencyReportFormV2';
 import { DeficiencyRecordList, AnyDeficiencyRecord } from './components/DeficiencyRecordList';
 import { AuditStatsDashboard } from './components/AuditStatsDashboard';
+import { setPdfIndexForTest } from './services/pdfIndex';
 import { User } from './types';
 import { ClipboardCheck, User as UserIcon, Users, ShieldAlert, ChevronRight, X, AlertTriangle, BarChart3 } from 'lucide-react';
 
@@ -19,6 +20,15 @@ const MOCK_EMPLOYEES = [
 
 localStorage.setItem('cache_stations', JSON.stringify(MOCK_STATIONS));
 localStorage.setItem('admin_employees', JSON.stringify(MOCK_EMPLOYEES));
+
+// 模擬後端 getAuditPdfIndex 回傳的稽核 PDF 資料夾清單（判斷 Z 欄項目是照片還是 PDF）
+setPdfIndexForTest([
+  { id: '1FsWRwVFnyY4Gd5WaEO8btHXSlmCnBBC2', name: '2026_W37.pdf', path: '2026' },
+  { id: '1ZX1jkHkz2Woee7hczzpYZKkLayqx6LHb', name: 'WK36_稽核缺失佈達.pdf', path: '2026' },
+  { id: '1gbPtEKVS1D3xyA1COoEs56CanBULU33J', name: 'N1區域品質管理稽核_W16.pdf', path: '2026' },
+  { id: '1CnD8DKvsvetk_0fwqKuiq9AWuCtfB36U', name: '2026_WK16_稽核缺失佈達.pdf', path: '2026' },
+  { id: '1VGWLmK8CXJGGqPYx__pdJpwL9EKUKEI9', name: '2026_WK06_稽核缺失佈達.pdf', path: '2026' },
+]);
 
 const realFetch = window.fetch.bind(window);
 window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
@@ -49,6 +59,20 @@ const MOCK_RECORDS: AnyDeficiencyRecord[] = [
       { label: '車倉相關', text: '防火提袋破損，未使用LV1方式運送', count: '2' },
     ],
     photoUrl: 'https://drive.google.com/drive/folders/xxxx', auditor: '測試稽核員',
+  },
+  // v2 附件混合：照片 + PDF 連結 + 純文字關鍵字（對照上面的 PDF 清單）
+  {
+    version: 'v2', zone: 'N1', name: '王小明', station: 'GNT2609961961',
+    date: '2026-09-10', auditType: '月保養',
+    items: [{ label: '現場須立即填寫的文件', text: '月保養點檢表第一頁模糊', count: '1' }],
+    photoUrl: [
+      'https://drive.google.com/file/d/1_y-wBBoxKnhrAsv1L2pAfeB28wPjbn74/view?usp=drivesdk', // 照片（不在 PDF 清單）
+      'https://drive.google.com/file/d/1gbPtEKVS1D3xyA1COoEs56CanBULU33J/view?usp=sharing',  // PDF 連結（在清單裡）
+      'GNT2609961961  2026_WK37',                                                            // 關鍵字 → 2026_W37.pdf
+      '2026/2026_WK06_稽核缺失佈達.pdf',                                                      // 路徑 → 直接命中
+      '總部稽核-W16、17',                                                                     // 模稜兩可（W16 有兩份）→ 顯示為文字
+    ].join(',\n'),
+    auditor: '測試稽核員',
   },
   // v2 無缺失（月保養）
   {
