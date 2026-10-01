@@ -5,10 +5,10 @@ import {
 } from '../types';
 import type { PdfIndexFile } from './attachments';
 
-async function apiRequest<T>(apiUrl: string, payload: any): Promise<T> {
+async function apiRequest<T>(apiUrl: string, payload: any, timeoutMs = 90000): Promise<T> {
     if (!apiUrl) throw new Error("API URL 未設定");
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 90000); 
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
     try {
       const url = payload.action ? `${apiUrl}${apiUrl.includes('?') ? '&' : '?'}action=${payload.action}` : apiUrl;
       const response = await fetch(url, {
@@ -27,21 +27,43 @@ async function apiRequest<T>(apiUrl: string, payload: any): Promise<T> {
     } catch (error) { clearTimeout(timeoutId); throw error; }
 }
 
+// 唯讀請求專用：GAS 偶發的網路中斷、轉導失敗、HTML 錯誤頁、{status:"Running"}、
+// 或後端回 success:false（多為試算表服務逾時）都自動重試，重複讀取沒有副作用。
+// 每次最多等 45 秒，最多 3 次（間隔 1.5s、4s）。寫入請求不要用這個。
+const READ_RETRY_DELAYS = [1500, 4000];
+async function apiRead<T extends { success?: boolean }>(apiUrl: string, payload: any): Promise<T> {
+    let lastError: unknown = null;
+    for (let attempt = 0; attempt <= READ_RETRY_DELAYS.length; attempt++) {
+        if (attempt > 0) await new Promise(r => setTimeout(r, READ_RETRY_DELAYS[attempt - 1]));
+        try {
+            const res = await apiRequest<T>(apiUrl, payload, 45000);
+            if (res && res.success === true) return res;
+            lastError = res;
+        } catch (error) {
+            lastError = error;
+        }
+    }
+    if (lastError && typeof lastError === 'object' && 'success' in (lastError as any)) return lastError as T;
+    throw lastError instanceof Error ? lastError : new Error("讀取失敗");
+}
+
 export const authenticateEmployee = async (apiUrl: string, name: string, password: string): Promise<AuthResponse> => { try { return await apiRequest<AuthResponse>(apiUrl, { action: 'authenticate', name, password }); } catch (error) { return { success: false, message: error instanceof Error ? error.message : "連線錯誤" }; } };
 export const changePassword = async (apiUrl: string, name: string, currentPassword: string, newPassword: string): Promise<{ success: boolean; message: string }> => { try { return await apiRequest(apiUrl, { action: 'changePassword', name, currentPassword, newPassword }); } catch (error) { return { success: false, message: "連線錯誤" }; } };
 export const submitAssessment = async (apiUrl: string, name: string, answers: string[], userDetails?: any, questions?: string[]): Promise<{ success: boolean; message: string }> => { try { return await apiRequest(apiUrl, { action: 'submitAssessment', name, answers, jobTitle: userDetails?.jobTitle, jobGrade: userDetails?.jobGrade, yearsOfService: userDetails?.yearsOfService, questions: questions || [] }); } catch (error) { return { success: false, message: "提交失敗" }; } };
 export const fetchHistory = async (apiUrl: string, name: string): Promise<{ success: boolean; records: AssessmentRecord[]; message?: string }> => { try { return await apiRequest(apiUrl, { action: 'getHistory', name }); } catch (error) { return { success: false, records: [], message: "無法載入紀錄" }; } };
-export const fetchAdminData = async (apiUrl: string): Promise<AdminDataResponse> => { try { return await apiRequest(apiUrl, { action: 'getAdminData' }); } catch (error) { return { success: false, records: [], questions: [] }; } };
+export const fetchAdminData = async (apiUrl: string): Promise<AdminDataResponse> => { try { return await apiRead(apiUrl, { action: 'getAdminData' }); } catch (error) { return { success: false, records: [], questions: [] }; } };
 export const updateQuestions = async (apiUrl: string, questions: string[]): Promise<{ success: boolean; message: string }> => { try { return await apiRequest(apiUrl, { action: 'updateQuestions', questions }); } catch (error) { return { success: false, message: "更新失敗" }; } };
 export const updateAdminPassword = async (apiUrl: string, newPassword: string): Promise<{ success: boolean; message: string }> => { try { return await apiRequest(apiUrl, { action: 'updateAdminPassword', newPassword }); } catch (error) { return { success: false, message: "密碼更新失敗" }; } };
 export const submitAdminReview = async (apiUrl: string, rowIndex: number, adminComment: string, adminScore: number): Promise<{ success: boolean; message: string }> => { try { return await apiRequest(apiUrl, { action: 'submitAdminReview', rowIndex, adminComment, adminScore }); } catch (error) { return { success: false, message: "評分失敗" }; } };
-export const fetchEmployeeList = async (apiUrl: string): Promise<EmployeeListResponse> => { try { return await apiRequest(apiUrl, { action: 'getEmployeeList' }); } catch (error) { return { success: false, employees: [], message: "無法載入名單" }; } };
+export const fetchEmployeeList = async (apiUrl: string): Promise<EmployeeListResponse> => { try { return await apiRead(apiUrl, { action: 'getEmployeeList' }); } catch (error) { return { success: false, employees: [], message: "無法載入名單" }; } };
 export const updateEmployeeList = async (apiUrl: string, employees: Employee[]): Promise<{ success: boolean; message: string }> => { try { return await apiRequest(apiUrl, { action: 'updateEmployeeList', employees }); } catch (error) { return { success: false, message: "更新失敗" }; } };
 
 // readKeys：該員工已在伺服器標記已讀的稽核紀錄鍵（舊版 GAS 沒有這個欄位，前端會退回只用本機已讀）
-export const fetchDeficiencyRecords = async (apiUrl: string, name?: string): Promise<{ success: boolean; records: AnyDeficiencyRecord[]; readKeys?: string[]; message?: string }> => {
+// v2Ok：false 表示新版(v2)紀錄這次沒讀到（不是真的 0 筆），呼叫端應保留上一份 v2；舊版 GAS 不回這個欄位
+// noCache：略過 GAS 端 3 分鐘的稽核資料快取（管理員手動重新整理時用）
+export const fetchDeficiencyRecords = async (apiUrl: string, name?: string, opts?: { noCache?: boolean }): Promise<{ success: boolean; records: AnyDeficiencyRecord[]; readKeys?: string[]; v2Ok?: boolean; message?: string }> => {
   try {
-    return await apiRequest(apiUrl, { action: 'getDeficiencyRecords', name: name || "" });
+    return await apiRead(apiUrl, { action: 'getDeficiencyRecords', name: name || "", noCache: opts?.noCache === true });
   } catch (error) { return { success: false, records: [], message: "無法載入稽核紀錄" }; }
 };
 
@@ -60,7 +82,7 @@ export const markAuditRead = async (
   } catch (error) { return { success: false, message: "連線失敗" }; }
 };
 
-export const fetchShiftSchedule = async <T = any>(apiUrl: string, name?: string): Promise<ShiftScheduleResponse<T>> => { try { return await apiRequest(apiUrl, { action: 'getShiftSchedule', name: name || "" }); } catch (error) { return { success: false, shifts: [], message: "無法載入班表" }; } };
+export const fetchShiftSchedule = async <T = any>(apiUrl: string, name?: string): Promise<ShiftScheduleResponse<T>> => { try { return await apiRead(apiUrl, { action: 'getShiftSchedule', name: name || "" }); } catch (error) { return { success: false, shifts: [], message: "無法載入班表" }; } };
 export const kickUser = async (apiUrl: string, name: string): Promise<{ success: boolean; message: string }> => { try { return await apiRequest(apiUrl, { action: 'kickUser', name }); } catch (error) { return { success: false, message: "指令失敗" }; } };
 
 export const checkLoginStatus = async (apiUrl: string, name: string, sessionTime: number): Promise<{
@@ -192,7 +214,7 @@ export const fetchStationList = async (apiUrl: string): Promise<{ success: boole
 
 export const fetchOfficeList = async (apiUrl: string): Promise<{ success: boolean; offices: string[] }> => { 
     try { 
-        const res = await apiRequest<{ success: boolean, offices: string[] }>(apiUrl, { action: 'getOfficeList' }); 
+        const res = await apiRead<{ success: boolean, offices: string[] }>(apiUrl, { action: 'getOfficeList' }); 
         return { success: res.success, stations: res.offices || [] } as any; 
     } catch (error) { return { success: false, offices: [] } as any; } 
 };
@@ -216,9 +238,9 @@ export const fetchAuditPdfIndex = async (apiUrl: string): Promise<{ success: boo
   try { return await apiRequest(apiUrl, { action: 'getAuditPdfIndex' }); } catch (error) { return { success: false, files: [], message: '無法載入 PDF 清單' }; }
 };
 
-export const fetchMyAuditRecords = async (apiUrl: string, name: string): Promise<{ success: boolean; records: AnyDeficiencyRecord[]; message?: string }> => {
+export const fetchMyAuditRecords = async (apiUrl: string, name: string): Promise<{ success: boolean; records: AnyDeficiencyRecord[]; v2Ok?: boolean; message?: string }> => {
   try {
-    return await apiRequest(apiUrl, { action: 'getMyDeficiencyAudits', name });
+    return await apiRead(apiUrl, { action: 'getMyDeficiencyAudits', name });
   } catch (error) { return { success: false, records: [], message: "無法載入稽核紀錄" }; }
 };
 

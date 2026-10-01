@@ -169,7 +169,8 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ user, apiUrl, onBack, 
     `cache_profile_${user.name}`,
     async () => {
       const data = await fetchDeficiencyRecords(apiUrl, user.name);
-      return data.success ? data.records : null;
+      // v2Ok:false = 新版紀錄這次沒讀到，當成失敗以保留快取
+      return data.success && data.v2Ok !== false ? data.records : null;
     },
     []
   );

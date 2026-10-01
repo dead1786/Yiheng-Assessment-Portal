@@ -97,37 +97,50 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
   });
   const lastSyncedRef = useRef<number | null>(lastSyncedAt);
   const syncingRef = useRef(false);
+  const deficienciesRef = useRef(allDeficiencies);
+  deficienciesRef.current = allDeficiencies;
+  const [syncFailedParts, setSyncFailedParts] = useState<string[]>([]);
 
+  // forceRefresh（右上角重新整理）：略過 GAS 端稽核快取直接重讀試算表。
+  // 不先清掉本機快取——同步失敗時畫面仍保有上一份資料，而不是變成空白。
   const loadData = async (forceRefresh = false) => {
     if (syncingRef.current) return;
     syncingRef.current = true;
-    if (forceRefresh) {
-        setIsLoading(true);
-        localStorage.removeItem('admin_records');
-        localStorage.removeItem('admin_employees');
-        localStorage.removeItem('admin_deficiencies');
-        localStorage.removeItem('admin_schedule');
-    }
     setIsSyncing(true);
 
     try {
-      const data = await fetchAdminData(apiUrl);
+      // 五個請求彼此獨立，同時發出：總耗時 ≈ 最慢的一個，而不是五個相加
+      const [data, empData, defData, schedData, officeRes] = await Promise.all([
+        fetchAdminData(apiUrl),
+        fetchEmployeeList(apiUrl),
+        fetchDeficiencyRecords(apiUrl, undefined, { noCache: forceRefresh }),
+        fetchShiftSchedule<FullShift>(apiUrl),
+        fetchOfficeList(apiUrl),
+      ]);
       if (data.success) { setRecords(data.records); localStorage.setItem('admin_records', JSON.stringify(data.records)); }
-      const empData = await fetchEmployeeList(apiUrl);
       if (empData.success) { setEmployees(empData.employees); localStorage.setItem('admin_employees', JSON.stringify(empData.employees)); }
-      const defData = await fetchDeficiencyRecords(apiUrl);
-      if (defData.success) { setAllDeficiencies(defData.records); localStorage.setItem('admin_deficiencies', JSON.stringify(defData.records)); }
-      const schedData = await fetchShiftSchedule<FullShift>(apiUrl);
+      if (defData.success) {
+        let defs = defData.records;
+        // GAS 這次沒讀到 v2（例如試算表服務逾時），保留上一份 v2，避免新版稽核紀錄整批消失
+        if (defData.v2Ok === false) {
+          defs = defs.filter(r => r.version !== 'v2').concat(deficienciesRef.current.filter(r => r.version === 'v2'));
+        }
+        setAllDeficiencies(defs);
+        localStorage.setItem('admin_deficiencies', JSON.stringify(defs));
+      }
       if (schedData.success) { localStorage.setItem('admin_schedule', JSON.stringify(schedData.shifts)); }
-
-      const officeRes = await fetchOfficeList(apiUrl);
       if (officeRes.success) {
           const stations = (officeRes as any).stations || (officeRes as any).offices || [];
           setAvailableOffices(stations);
       }
 
       // 三大核心資料任一同步失敗就標記，避免管理員看著舊資料不自知
-      const allOk = data.success && empData.success && defData.success;
+      const failed: string[] = [];
+      if (!data.success) failed.push('填答紀錄');
+      if (!empData.success) failed.push('員工名單');
+      if (!defData.success || defData.v2Ok === false) failed.push('稽核紀錄');
+      setSyncFailedParts(failed);
+      const allOk = failed.length === 0;
       setSyncFailed(!allOk);
       if (allOk) {
         const now = Date.now();
@@ -135,7 +148,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, apiUrl, on
         lastSyncedRef.current = now;
         localStorage.setItem('admin_data_syncedAt', String(now));
       }
-    } catch (e) { console.error("Sync failed"); setSyncFailed(true); }
+    } catch (e) { console.error("Sync failed", e); setSyncFailed(true); setSyncFailedParts([]); }
     finally { syncingRef.current = false; setIsLoading(false); setIsSyncing(false); }
   };
 
@@ -281,12 +294,12 @@ const handleViewPhotos = (photoUrlString: string | undefined) => {
 
   return (
     <div className="w-full max-w-7xl animate-in fade-in duration-500 relative">
-      <SyncStatus isSyncing={isSyncing} syncFailed={syncFailed} lastSyncedAt={lastSyncedAt} onRetry={() => loadData()} position="bottom-right" />
+      <SyncStatus isSyncing={isSyncing} syncFailed={syncFailed} failedDetail={syncFailedParts.join('、')} lastSyncedAt={lastSyncedAt} onRetry={() => loadData()} position="bottom-right" />
 
       <header className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
         <div><h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><Users className="text-blue-600" />管理員控制台</h1><p className="text-gray-500 mt-1">管理員：<span className="font-semibold">{user.name}</span></p></div>
         <div className="flex gap-3">
-            <button onClick={() => loadData(true)} className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"><RefreshCw size={20} className={isLoading ? "animate-spin" : ""} /></button>
+            <button onClick={() => loadData(true)} className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"><RefreshCw size={20} className={isLoading || isSyncing ? "animate-spin" : ""} /></button>
             <button onClick={onLogout} className="flex items-center px-4 py-2 text-sm font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"><LogOut className="w-4 h-4 mr-2" />登出</button>
         </div>
       </header>

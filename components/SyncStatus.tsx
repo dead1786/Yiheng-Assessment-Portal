@@ -7,6 +7,8 @@ interface SyncStatusProps {
   syncFailed: boolean;
   lastSyncedAt: number | null;
   onRetry: () => void;
+  /** 失敗的資料項目（例如「稽核紀錄」），有的話顯示在失敗提示裡 */
+  failedDetail?: string;
   /** 同步中顯示的文字 */
   syncingText?: string;
   /** top: 頁面上方置中（預設）；bottom-right: 右下角固定 */
@@ -19,7 +21,7 @@ interface SyncStatusProps {
  * - 同步失敗：紅色提示條，顯示目前資料的時間並可點擊重試
  */
 export const SyncStatus: React.FC<SyncStatusProps> = ({
-  isSyncing, syncFailed, lastSyncedAt, onRetry,
+  isSyncing, syncFailed, lastSyncedAt, onRetry, failedDetail,
   syncingText = '正在同步最新資料...',
   position = 'top',
 }) => {
@@ -38,6 +40,7 @@ export const SyncStatus: React.FC<SyncStatusProps> = ({
 
   if (syncFailed) {
     const age = formatAge(lastSyncedAt);
+    const what = failedDetail ? `${failedDetail}同步失敗` : '同步失敗';
     return (
       <button
         onClick={onRetry}
@@ -45,7 +48,7 @@ export const SyncStatus: React.FC<SyncStatusProps> = ({
       >
         <CloudOff size={16} />
         <span className="text-xs font-bold whitespace-nowrap">
-          {age ? `同步失敗，顯示的是 ${age} 的資料` : '同步失敗，無法取得最新資料'}｜點此重試
+          {age ? `${what}，顯示的是 ${age} 的資料` : `${what}，無法取得最新資料`}｜點此重試
         </span>
       </button>
     );

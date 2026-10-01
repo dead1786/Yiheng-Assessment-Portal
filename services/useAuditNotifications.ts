@@ -66,7 +66,7 @@ export function useAuditNotifications(name: string | null, apiUrl: string): Audi
     async () => {
       if (!active || !name) return null;
       const res = await fetchDeficiencyRecords(apiUrl, name);
-      if (!res.success) return null;
+      if (!res.success || res.v2Ok === false) return null;   // v2 沒讀到時保留快取，不要把新版紀錄當 0 筆
       if (Array.isArray(res.readKeys)) {
         const merged = mergeServerKeys(name, res.readKeys);
         setReadKeys(new Set(merged.keys));

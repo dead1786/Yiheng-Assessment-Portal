@@ -61,7 +61,7 @@ export const AuditRecordsView: React.FC<AuditRecordsViewProps> = ({ user, apiUrl
     cacheKey,
     async () => {
       const res = await fetchMyAuditRecords(apiUrl, user.name);
-      return res.success ? res.records : null;
+      return res.success && res.v2Ok !== false ? res.records : null;   // v2 沒讀到時保留快取
     },
     []
   );
